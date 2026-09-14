@@ -22,56 +22,111 @@ const fs = require('fs');
 const path = require('path');
 
 // =====================================================
-// STAFF REPORTS — CONFIG
+// STAFF REPORTS CONFIGURATION
 // =====================================================
 
 const GUILD_ID = '1543363950262100118';
 
+// =====================================================
+// OWNER / CO-OWNER REPORT REQUEST SYSTEM
+// =====================================================
+
+// Owner / Co-Owner requests staff reports here
 const REQUEST_REPORT_CHANNEL_ID = '1549136946683576380';
 
-const SENIOR_STAFF_ROLE_ID = '1543367669385011302';
-const GENERAL_STAFF_ROLE_ID = '1543373922668388482';
-
+// Private requested-report channels are created here
 const REQUESTED_REPORTS_CATEGORY_ID = '1549140124854653038';
+
+// Completed requested reports go here
 const SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID = '1549140613788864563';
 
-const REPORTS_TO_MAKE_CHANNEL_ID = '1549141254653349920';
-const STAFF_CREATED_REPORTS_CHANNEL_ID = '1549141094388863126';
+// =====================================================
+// STAFF ROLES
+// =====================================================
 
-// Optional: add your Owner role ID in .env as OWNER_ROLE_ID.
-// If you do not set it, the server owner and members with Administrator
-// permission can use the owner-only request panel.
-const OWNER_ROLE_ID = process.env.OWNER_ROLE_ID || null;
-const CO_OWNER_ROLE_ID = process.env.CO_OWNER_ROLE_ID || null;
+const SENIOR_STAFF_ROLE_ID = '1543367669385011302';
+
+const GENERAL_STAFF_ROLE_ID = '1543373922668388482';
+
+// =====================================================
+// GENERAL STAFF REPORT SYSTEM
+// =====================================================
+
+// General Staff creates reports here
+const GENERAL_REPORTS_TO_MAKE_CHANNEL_ID = '1549141254653349920';
+
+// General Staff reports are sent here
+// Senior Staff reviews them here
+const GENERAL_REPORTS_REVIEW_CHANNEL_ID = '1549149758202052818';
+
+// =====================================================
+// SENIOR STAFF REPORT SYSTEM
+// =====================================================
+
+// Senior Staff creates reports for Owner / Co-Owner here
+const SENIOR_REPORTS_TO_MAKE_CHANNEL_ID = '1549148764760055838';
+
+// Senior Staff reports are sent here for Owner / Co-Owner
+const SENIOR_REPORTS_DESTINATION_CHANNEL_ID = '1549141094388863126';
+
+// =====================================================
+// ENVIRONMENT VARIABLES
+// =====================================================
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
+const OWNER_ROLE_ID =
+  process.env.OWNER_ROLE_ID || null;
+
+const CO_OWNER_ROLE_ID =
+  process.env.CO_OWNER_ROLE_ID || null;
+
 if (!DISCORD_TOKEN) {
-  console.error('❌ Missing DISCORD_TOKEN in environment variables.');
+  console.error(
+    '❌ Missing DISCORD_TOKEN environment variable.'
+  );
+
   process.exit(1);
 }
 
 // =====================================================
-// DATA
+// DATA FILE
 // =====================================================
 
-const DATA_FILE = path.join(__dirname, 'staff-reports-data.json');
+const DATA_FILE = path.join(
+  __dirname,
+  'staff-reports-data.json'
+);
 
 function loadData() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
-      return { requests: {}, recurrenceQueue: [] };
+      return {
+        requests: {},
+      };
     }
 
-    const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    const parsed =
+      JSON.parse(
+        fs.readFileSync(
+          DATA_FILE,
+          'utf8'
+        )
+      );
 
     return {
-      requests: parsed.requests || {},
-      recurrenceQueue: parsed.recurrenceQueue || [],
+      requests:
+        parsed.requests || {},
     };
   } catch (error) {
-    console.error('⚠️ Could not read staff-reports-data.json:', error);
-    return { requests: {}, recurrenceQueue: [] };
+    console.error(
+      '⚠️ Could not load staff reports data:',
+      error
+    );
+
+    return {
+      requests: {},
+    };
   }
 }
 
@@ -79,56 +134,129 @@ let data = loadData();
 
 function saveData() {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(
+        data,
+        null,
+        2
+      )
+    );
   } catch (error) {
-    console.error('⚠️ Could not save staff-reports-data.json:', error);
+    console.error(
+      '⚠️ Could not save staff reports data:',
+      error
+    );
   }
 }
 
-// Temporary owner form sessions.
-const ownerDrafts = new Map();
+// Temporary Owner / Co-Owner request forms
+const requestDrafts = new Map();
 
 // =====================================================
-// CLIENT
+// DISCORD CLIENT
 // =====================================================
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-  ],
-});
+const client =
+  new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+    ],
+  });
 
 // =====================================================
-// HELPERS
+// PERMISSION HELPERS
 // =====================================================
 
-function isOwnerAuthorized(member, guild) {
-  if (!member) return false;
+function canRequestReports(
+  member,
+  guild
+) {
+  if (!member) {
+    return false;
+  }
 
-  if (guild.ownerId === member.id) return true;
-
-  if (member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+  // Actual Discord server owner
+  if (
+    member.id ===
+    guild.ownerId
+  ) {
     return true;
   }
 
-  if (OWNER_ROLE_ID && member.roles.cache.has(OWNER_ROLE_ID)) {
+  // Administrator
+  if (
+    member.permissions.has(
+      PermissionsBitField
+        .Flags.Administrator
+    )
+  ) {
     return true;
   }
 
-  if (CO_OWNER_ROLE_ID && member.roles.cache.has(CO_OWNER_ROLE_ID)) {
+  // Owner role
+  if (
+    OWNER_ROLE_ID &&
+    member.roles.cache.has(
+      OWNER_ROLE_ID
+    )
+  ) {
+    return true;
+  }
+
+  // Co-Owner role
+  if (
+    CO_OWNER_ROLE_ID &&
+    member.roles.cache.has(
+      CO_OWNER_ROLE_ID
+    )
+  ) {
     return true;
   }
 
   return false;
 }
 
-function isStaff(member) {
-  if (!member) return false;
+function isSeniorStaff(member) {
+  if (!member) {
+    return false;
+  }
 
+  return member.roles.cache.has(
+    SENIOR_STAFF_ROLE_ID
+  );
+}
+
+function isGeneralStaff(member) {
+  if (!member) {
+    return false;
+  }
+
+  return member.roles.cache.has(
+    GENERAL_STAFF_ROLE_ID
+  );
+}
+
+function isStaff(member) {
   return (
-    member.roles.cache.has(SENIOR_STAFF_ROLE_ID) ||
-    member.roles.cache.has(GENERAL_STAFF_ROLE_ID)
+    isSeniorStaff(member) ||
+    isGeneralStaff(member)
+  );
+}
+
+// =====================================================
+// GENERAL HELPERS
+// =====================================================
+
+function createRequestId() {
+  return (
+    Date.now().toString() +
+    '-' +
+    Math.floor(
+      Math.random() *
+      100000
+    )
   );
 }
 
@@ -136,1097 +264,2544 @@ function sanitizeChannelName(name) {
   return (
     name
       .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 75) || 'staff-report'
+      .replace(
+        /[^a-z0-9-]/g,
+        '-'
+      )
+      .replace(
+        /-+/g,
+        '-'
+      )
+      .replace(
+        /^-|-$/g,
+        ''
+      )
+      .slice(
+        0,
+        80
+      ) ||
+    'staff-report'
   );
 }
 
-function makeRequestId() {
-  return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-}
+function makeDiscordTimestamp(ms) {
+  const unix =
+    Math.floor(
+      ms / 1000
+    );
 
-function discordTime(unixSeconds) {
-  return `<t:${unixSeconds}:F> • <t:${unixSeconds}:R>`;
+  return (
+    `<t:${unix}:F> • ` +
+    `<t:${unix}:R>`
+  );
 }
 
 function parseHours(value) {
-  const number = Number(String(value).trim());
-  if (!Number.isFinite(number)) return null;
-  return number;
-}
-
-function parseRecurrenceToMs(value) {
-  if (!value) return null;
-
-  const text = String(value).trim().toLowerCase();
+  const hours =
+    Number(
+      String(value).trim()
+    );
 
   if (
-    text === 'none' ||
-    text === 'no' ||
-    text === 'never' ||
-    text === 'n/a' ||
-    text === 'na' ||
-    text === '0'
+    !Number.isFinite(hours)
   ) {
     return null;
   }
 
-  if (text === 'daily' || text === 'every day') return 24 * 60 * 60 * 1000;
-  if (text === 'weekly' || text === 'every week') return 7 * 24 * 60 * 60 * 1000;
-  if (text === 'biweekly' || text === 'every 2 weeks') return 14 * 24 * 60 * 60 * 1000;
-  if (text === 'monthly' || text === 'every month') return 30 * 24 * 60 * 60 * 1000;
+  return hours;
+}
 
-  const match = text.match(
-    /(?:every\s*)?(\d+(?:\.\d+)?)\s*(hour|hours|hr|hrs|day|days|week|weeks|month|months)/
+async function getChannel(
+  guild,
+  channelId
+) {
+  return (
+    guild.channels.cache.get(
+      channelId
+    ) ||
+    await guild.channels
+      .fetch(channelId)
+      .catch(
+        () => null
+      )
   );
-
-  if (!match) return null;
-
-  const amount = Number(match[1]);
-  const unit = match[2];
-
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-
-  if (unit.startsWith('hour') || unit === 'hr' || unit === 'hrs') {
-    return amount * 60 * 60 * 1000;
-  }
-
-  if (unit.startsWith('day')) {
-    return amount * 24 * 60 * 60 * 1000;
-  }
-
-  if (unit.startsWith('week')) {
-    return amount * 7 * 24 * 60 * 60 * 1000;
-  }
-
-  if (unit.startsWith('month')) {
-    return amount * 30 * 24 * 60 * 60 * 1000;
-  }
-
-  return null;
 }
 
-async function fetchChannel(guild, channelId) {
-  return guild.channels.cache.get(channelId) || guild.channels.fetch(channelId);
+async function getMember(
+  guild,
+  userId
+) {
+  return (
+    guild.members.cache.get(
+      userId
+    ) ||
+    await guild.members
+      .fetch(userId)
+      .catch(
+        () => null
+      )
+  );
 }
 
-async function getRoleMembers(guild, roleId) {
-  const role = guild.roles.cache.get(roleId);
-  if (!role) return [];
+// =====================================================
+// GET REPORT TARGETS
+// =====================================================
 
-  // Use Discord's existing role/member cache.
-  // Avoid guild.members.fetch() here because full member fetches can trigger
-  // Discord Gateway opcode 8 rate limits.
-  return [...role.members.values()].filter((member) => !member.user.bot);
-}
+async function getTargets(
+  guild,
+  draft
+) {
+  // ===================================================
+  // ONE SENIOR STAFF
+  // ===================================================
 
-async function getTargetMembers(guild, draft) {
-  if (draft.targetMode === 'senior_member' || draft.targetMode === 'general_member') {
-    const member = await guild.members.fetch(draft.targetUserId).catch(() => null);
-    return member ? [member] : [];
-  }
+  if (
+    draft.targetMode ===
+    'one_senior'
+  ) {
+    const member =
+      await getMember(
+        guild,
+        draft.targetUserIds[0]
+      );
 
-  if (draft.targetMode === 'all_senior') {
-    return getRoleMembers(guild, SENIOR_STAFF_ROLE_ID);
-  }
-
-  if (draft.targetMode === 'all_general') {
-    return getRoleMembers(guild, GENERAL_STAFF_ROLE_ID);
-  }
-
-  if (draft.targetMode === 'both_groups') {
-    const seniors = await getRoleMembers(guild, SENIOR_STAFF_ROLE_ID);
-    const generals = await getRoleMembers(guild, GENERAL_STAFF_ROLE_ID);
-
-    const unique = new Map();
-    for (const member of [...seniors, ...generals]) {
-      unique.set(member.id, member);
+    if (
+      member &&
+      isSeniorStaff(member)
+    ) {
+      return [member];
     }
 
-    return [...unique.values()];
+    return [];
+  }
+
+  // ===================================================
+  // ONE GENERAL STAFF
+  // ===================================================
+
+  if (
+    draft.targetMode ===
+    'one_general'
+  ) {
+    const member =
+      await getMember(
+        guild,
+        draft.targetUserIds[0]
+      );
+
+    if (
+      member &&
+      isGeneralStaff(member)
+    ) {
+      return [member];
+    }
+
+    return [];
+  }
+
+  // ===================================================
+  // CERTAIN SELECTED STAFF
+  // ===================================================
+
+  if (
+    draft.targetMode ===
+    'selected_staff'
+  ) {
+    const members = [];
+
+    for (
+      const userId
+      of draft.targetUserIds
+    ) {
+      const member =
+        await getMember(
+          guild,
+          userId
+        );
+
+      if (
+        member &&
+        isStaff(member) &&
+        !member.user.bot
+      ) {
+        members.push(
+          member
+        );
+      }
+    }
+
+    return members;
+  }
+
+  // ===================================================
+  // ALL SENIOR STAFF
+  // ===================================================
+
+  if (
+    draft.targetMode ===
+    'all_senior'
+  ) {
+    const role =
+      guild.roles.cache.get(
+        SENIOR_STAFF_ROLE_ID
+      );
+
+    if (!role) {
+      return [];
+    }
+
+    return [
+      ...role.members.values(),
+    ].filter(
+      member =>
+        !member.user.bot
+    );
+  }
+
+  // ===================================================
+  // ALL GENERAL STAFF
+  // ===================================================
+
+  if (
+    draft.targetMode ===
+    'all_general'
+  ) {
+    const role =
+      guild.roles.cache.get(
+        GENERAL_STAFF_ROLE_ID
+      );
+
+    if (!role) {
+      return [];
+    }
+
+    return [
+      ...role.members.values(),
+    ].filter(
+      member =>
+        !member.user.bot
+    );
+  }
+
+  // ===================================================
+  // BOTH STAFF GROUPS
+  // ===================================================
+
+  if (
+    draft.targetMode ===
+    'both_groups'
+  ) {
+    const seniorRole =
+      guild.roles.cache.get(
+        SENIOR_STAFF_ROLE_ID
+      );
+
+    const generalRole =
+      guild.roles.cache.get(
+        GENERAL_STAFF_ROLE_ID
+      );
+
+    const unique =
+      new Map();
+
+    if (seniorRole) {
+      for (
+        const member
+        of seniorRole.members.values()
+      ) {
+        if (
+          !member.user.bot
+        ) {
+          unique.set(
+            member.id,
+            member
+          );
+        }
+      }
+    }
+
+    if (generalRole) {
+      for (
+        const member
+        of generalRole.members.values()
+      ) {
+        if (
+          !member.user.bot
+        ) {
+          unique.set(
+            member.id,
+            member
+          );
+        }
+      }
+    }
+
+    return [
+      ...unique.values(),
+    ];
   }
 
   return [];
 }
 
-async function ensureRequestPanel(guild) {
-  const channel = await fetchChannel(guild, REQUEST_REPORT_CHANNEL_ID);
+// =====================================================
+// OWNER / CO-OWNER PANEL
+// =====================================================
 
-  if (!channel || !channel.isTextBased()) {
-    throw new Error('Request report channel is missing or is not a text channel.');
+async function createOwnerPanel(
+  guild
+) {
+  const channel =
+    await getChannel(
+      guild,
+      REQUEST_REPORT_CHANNEL_ID
+    );
+
+  if (
+    !channel ||
+    !channel.isTextBased()
+  ) {
+    console.error(
+      '❌ Request-a-report channel not found.'
+    );
+
+    return;
   }
 
-  const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+  const messages =
+    await channel.messages
+      .fetch({
+        limit: 50,
+      })
+      .catch(
+        () => null
+      );
 
-  const existing = messages?.find(
-    (message) =>
-      message.author.id === client.user.id &&
-      message.components.some((row) =>
-        row.components.some((component) => component.customId === 'owner_request_report')
+  const oldPanel =
+    messages?.find(
+      message =>
+        message.author.id ===
+          client.user.id &&
+        message.components.some(
+          row =>
+            row.components.some(
+              component =>
+                component.customId ===
+                'request_staff_report'
+            )
+        )
+    );
+
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        '📋 Staff Report Requests'
       )
-  );
-
-  const embed = new EmbedBuilder()
-    .setTitle('📋 Staff Report Requests')
-    .setDescription(
-      [
-        'Owner panel for requesting reports from staff.',
-        '',
-        'You can request a report from:',
-        '• One Senior Staff member',
-        '• One General Staff member',
-        '• All Senior Staff',
-        '• All General Staff',
-        '• Both staff groups',
-        '',
-        '**Due times use Discord timestamps, so every person sees the deadline in their own timezone.**',
-        '**Minimum deadline: 24 hours from the request.**',
-      ].join('\n')
-    )
-    .setFooter({ text: 'Staff Reports System' });
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('owner_request_report')
-      .setLabel('Request a Report')
-      .setEmoji('📝')
-      .setStyle(ButtonStyle.Primary)
-  );
-
-  if (existing) {
-    await existing.edit({ embeds: [embed], components: [row] });
-  } else {
-    await channel.send({ embeds: [embed], components: [row] });
-  }
-}
-
-async function ensureStaffReportPanel(guild) {
-  const channel = await fetchChannel(guild, REPORTS_TO_MAKE_CHANNEL_ID);
-
-  if (!channel || !channel.isTextBased()) {
-    throw new Error('Reports-to-make channel is missing or is not a text channel.');
-  }
-
-  const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
-
-  const existing = messages?.find(
-    (message) =>
-      message.author.id === client.user.id &&
-      message.components.some((row) =>
-        row.components.some((component) => component.customId === 'staff_create_report')
+      .setDescription(
+        [
+          'Owner and Co-Owner can request reports from staff.',
+          '',
+          '**You can request a report from:**',
+          '',
+          '👤 One Senior Staff Member',
+          '👤 One General Staff Member',
+          '🎯 Certain Selected Staff Members',
+          '👥 All Senior Staff',
+          '👥 All General Staff',
+          '📣 Both Staff Groups',
+          '',
+          '**Certain Selected Staff Members** allows you to choose multiple specific Senior Staff and/or General Staff members.',
+          '',
+          '**Deadlines use Discord timestamps.**',
+          'Everyone automatically sees the deadline in their own timezone.',
+          '',
+          '**Minimum deadline: 24 hours.**',
+        ].join(
+          '\n'
+        )
       )
-  );
+      .setFooter({
+        text:
+          'Crafted SMP Staff Reports',
+      });
 
-  const embed = new EmbedBuilder()
-    .setTitle('🗂️ Staff Reports')
-    .setDescription(
-      [
-        'Senior Staff and General Staff can create reports here.',
-        '',
-        'Use this for reports that were **not specifically requested by the owner**.',
-        'After submission, the report is automatically sent to the staff-created reports channel.',
-      ].join('\n')
-    )
-    .setFooter({ text: 'Staff Reports System' });
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'request_staff_report'
+          )
+          .setLabel(
+            'Request a Report'
+          )
+          .setEmoji('📝')
+          .setStyle(
+            ButtonStyle.Primary
+          )
+      );
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('staff_create_report')
-      .setLabel('Create a Report')
-      .setEmoji('📄')
-      .setStyle(ButtonStyle.Success)
-  );
+  if (oldPanel) {
+    await oldPanel.edit({
+      embeds:
+        [embed],
 
-  if (existing) {
-    await existing.edit({ embeds: [embed], components: [row] });
+      components:
+        [row],
+    });
   } else {
-    await channel.send({ embeds: [embed], components: [row] });
-  }
-}
+    await channel.send({
+      embeds:
+        [embed],
 
-async function createRequestedReportChannel({
-  guild,
-  targetMember,
-  requesterId,
-  reportQuestion,
-  hoursUntilDue,
-  originalRequestId = null,
-}) {
-  const requestId = originalRequestId || makeRequestId();
-
-  const createdAt = Date.now();
-  const dueAt = createdAt + hoursUntilDue * 60 * 60 * 1000;
-  const dueUnix = Math.floor(dueAt / 1000);
-
-  const requester = await guild.members.fetch(requesterId).catch(() => null);
-
-  const channelName = sanitizeChannelName(
-    `report-${targetMember.user.username}-${String(requestId).slice(-6)}`
-  );
-
-  const permissionOverwrites = [
-    {
-      id: guild.roles.everyone.id,
-      deny: [PermissionsBitField.Flags.ViewChannel],
-    },
-    {
-      id: targetMember.id,
-      allow: [
-        PermissionsBitField.Flags.ViewChannel,
-        PermissionsBitField.Flags.SendMessages,
-        PermissionsBitField.Flags.ReadMessageHistory,
-      ],
-    },
-    {
-      id: SENIOR_STAFF_ROLE_ID,
-      allow: [
-        PermissionsBitField.Flags.ViewChannel,
-        PermissionsBitField.Flags.ReadMessageHistory,
-      ],
-    },
-    {
-      id: guild.ownerId,
-      allow: [
-        PermissionsBitField.Flags.ViewChannel,
-        PermissionsBitField.Flags.SendMessages,
-        PermissionsBitField.Flags.ReadMessageHistory,
-        PermissionsBitField.Flags.ManageChannels,
-      ],
-    },
-  ];
-
-  if (requester && requester.id !== guild.ownerId) {
-    permissionOverwrites.push({
-      id: requester.id,
-      allow: [
-        PermissionsBitField.Flags.ViewChannel,
-        PermissionsBitField.Flags.SendMessages,
-        PermissionsBitField.Flags.ReadMessageHistory,
-      ],
+      components:
+        [row],
     });
   }
+}
 
-  if (OWNER_ROLE_ID) {
-    permissionOverwrites.push({
-      id: OWNER_ROLE_ID,
-      allow: [
-        PermissionsBitField.Flags.ViewChannel,
-        PermissionsBitField.Flags.SendMessages,
-        PermissionsBitField.Flags.ReadMessageHistory,
-        PermissionsBitField.Flags.ManageChannels,
-      ],
+// =====================================================
+// GENERAL STAFF REPORT PANEL
+// =====================================================
+
+async function createGeneralStaffPanel(
+  guild
+) {
+  const channel =
+    await getChannel(
+      guild,
+      GENERAL_REPORTS_TO_MAKE_CHANNEL_ID
+    );
+
+  if (
+    !channel ||
+    !channel.isTextBased()
+  ) {
+    console.error(
+      '❌ General Staff reports channel not found.'
+    );
+
+    return;
+  }
+
+  const messages =
+    await channel.messages
+      .fetch({
+        limit: 50,
+      })
+      .catch(
+        () => null
+      );
+
+  const oldPanel =
+    messages?.find(
+      message =>
+        message.author.id ===
+          client.user.id &&
+        message.components.some(
+          row =>
+            row.components.some(
+              component =>
+                component.customId ===
+                'create_general_report'
+            )
+        )
+    );
+
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        '📄 General Staff Reports'
+      )
+      .setDescription(
+        [
+          'This panel is for **General Staff**.',
+          '',
+          'Use this button to submit a report.',
+          '',
+          'Your report will be sent to **Senior Staff for review**.',
+        ].join(
+          '\n'
+        )
+      );
+
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'create_general_report'
+          )
+          .setLabel(
+            'Create General Staff Report'
+          )
+          .setEmoji('📄')
+          .setStyle(
+            ButtonStyle.Primary
+          )
+      );
+
+  if (oldPanel) {
+    await oldPanel.edit({
+      embeds:
+        [embed],
+
+      components:
+        [row],
+    });
+  } else {
+    await channel.send({
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   }
-
-  const channel = await guild.channels.create({
-    name: channelName,
-    type: ChannelType.GuildText,
-    parent: REQUESTED_REPORTS_CATEGORY_ID,
-    permissionOverwrites,
-    reason: `Requested staff report for ${targetMember.user.tag}`,
-  });
-
-  data.requests[requestId] = {
-    requestId,
-    guildId: guild.id,
-    channelId: channel.id,
-    targetUserId: targetMember.id,
-    requesterId,
-    reportQuestion,
-    createdAt,
-    dueAt,
-    status: 'open',
-  };
-
-  saveData();
-
-  const embed = new EmbedBuilder()
-    .setTitle('📋 Report Requested')
-    .setDescription(
-      [
-        `${targetMember}, you have been requested to submit a staff report.`,
-        '',
-        `**Requested by:** <@${requesterId}>`,
-        `**Report needed:** ${reportQuestion}`,
-        `**Deadline:** ${discordTime(dueUnix)}`,
-        '',
-        'Click **Submit Report** when your report is ready.',
-        'The submission form will also ask when another report should be requested.',
-      ].join('\n')
-    )
-    .setFooter({ text: `Request ID: ${requestId}` });
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`submit_requested_report:${requestId}`)
-      .setLabel('Submit Report')
-      .setEmoji('✅')
-      .setStyle(ButtonStyle.Success)
-  );
-
-  await channel.send({
-    content: `<@${targetMember.id}>`,
-    embeds: [embed],
-    components: [row],
-  });
-
-  return channel;
-}
-
-async function queueRecurringRequest({
-  guildId,
-  targetUserId,
-  requesterId,
-  reportQuestion,
-  recurrenceText,
-  recurrenceMs,
-  dueHours,
-}) {
-  const nextRunAt = Date.now() + recurrenceMs;
-
-  data.recurrenceQueue.push({
-    id: makeRequestId(),
-    guildId,
-    targetUserId,
-    requesterId,
-    reportQuestion,
-    recurrenceText,
-    recurrenceMs,
-    dueHours,
-    nextRunAt,
-  });
-
-  saveData();
-}
-
-async function processRecurrenceQueue() {
-  if (!client.isReady()) return;
-
-  const now = Date.now();
-
-  for (const item of [...data.recurrenceQueue]) {
-    if (item.nextRunAt > now) continue;
-
-    const guild = client.guilds.cache.get(item.guildId);
-    if (!guild) continue;
-
-    const targetMember =
-      guild.members.cache.get(item.targetUserId) ||
-      (await guild.members.fetch(item.targetUserId).catch(() => null));
-
-    if (!targetMember) {
-      data.recurrenceQueue = data.recurrenceQueue.filter((x) => x.id !== item.id);
-      saveData();
-      continue;
-    }
-
-    try {
-      await createRequestedReportChannel({
-        guild,
-        targetMember,
-        requesterId: item.requesterId,
-        reportQuestion: item.reportQuestion,
-        hoursUntilDue: Math.max(24, Number(item.dueHours) || 24),
-      });
-
-      item.nextRunAt = Date.now() + item.recurrenceMs;
-      saveData();
-    } catch (error) {
-      console.error('❌ Recurring report creation failed:', error);
-    }
-  }
 }
 
 // =====================================================
-// READY
+// SENIOR STAFF REPORT PANEL
 // =====================================================
 
-client.once(Events.ClientReady, async () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+async function createSeniorStaffPanel(
+  guild
+) {
+  const channel =
+    await getChannel(
+      guild,
+      SENIOR_REPORTS_TO_MAKE_CHANNEL_ID
+    );
 
-  try {
-    const guild = await client.guilds.fetch(GUILD_ID);
+  if (
+    !channel ||
+    !channel.isTextBased()
+  ) {
+    console.error(
+      '❌ Senior Staff reports channel not found.'
+    );
 
-    await ensureRequestPanel(guild);
-    await ensureStaffReportPanel(guild);
-
-    console.log('✅ Staff Reports panels are ready.');
-  } catch (error) {
-    console.error('❌ Startup setup error:', error);
+    return;
   }
 
-  setInterval(() => {
-    processRecurrenceQueue().catch(console.error);
-  }, 60 * 1000);
-
-  processRecurrenceQueue().catch(console.error);
-});
-
-// =====================================================
-// INTERACTIONS
-// =====================================================
-
-client.on(Events.InteractionCreate, async (interaction) => {
-  try {
-    if (!interaction.guild || interaction.guild.id !== GUILD_ID) return;
-
-    // -------------------------------------------------
-    // OWNER: START REQUEST
-    // -------------------------------------------------
-    if (interaction.isButton() && interaction.customId === 'owner_request_report') {
-      const member =
-        interaction.guild.members.cache.get(interaction.user.id) ||
-        (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
-
-      if (!isOwnerAuthorized(member, interaction.guild)) {
-        return interaction.reply({
-          content: '❌ Only the server Owner, Co-Owner, or authorized Administrator can request reports.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      ownerDrafts.set(interaction.user.id, {
-        requesterId: interaction.user.id,
-      });
-
-      const select = new StringSelectMenuBuilder()
-        .setCustomId('owner_report_target_mode')
-        .setPlaceholder('Choose who needs to make the report')
-        .addOptions([
-          {
-            label: 'One Senior Staff Member',
-            value: 'senior_member',
-            emoji: '👤',
-          },
-          {
-            label: 'One General Staff Member',
-            value: 'general_member',
-            emoji: '👤',
-          },
-          {
-            label: 'All Senior Staff',
-            value: 'all_senior',
-            emoji: '👥',
-          },
-          {
-            label: 'All General Staff',
-            value: 'all_general',
-            emoji: '👥',
-          },
-          {
-            label: 'Both Staff Groups',
-            value: 'both_groups',
-            emoji: '📣',
-          },
-        ]);
-
-      return interaction.reply({
-        content: '**Step 1:** Who should receive this report request?',
-        components: [new ActionRowBuilder().addComponents(select)],
-        flags: MessageFlags.Ephemeral,
-      });
-    }
-
-    // -------------------------------------------------
-    // OWNER: TARGET MODE SELECT
-    // -------------------------------------------------
-    if (
-      interaction.isStringSelectMenu() &&
-      interaction.customId === 'owner_report_target_mode'
-    ) {
-      const draft = ownerDrafts.get(interaction.user.id);
-
-      if (!draft) {
-        return interaction.reply({
-          content: '❌ This request session expired. Click **Request a Report** again.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      draft.targetMode = interaction.values[0];
-      ownerDrafts.set(interaction.user.id, draft);
-
-      if (
-        draft.targetMode === 'senior_member' ||
-        draft.targetMode === 'general_member'
-      ) {
-        const userSelect = new UserSelectMenuBuilder()
-          .setCustomId('owner_report_specific_user')
-          .setPlaceholder('Select the staff member')
-          .setMinValues(1)
-          .setMaxValues(1);
-
-        return interaction.update({
-          content:
-            draft.targetMode === 'senior_member'
-              ? '**Step 2:** Select one Senior Staff member.'
-              : '**Step 2:** Select one General Staff member.',
-          components: [new ActionRowBuilder().addComponents(userSelect)],
-        });
-      }
-
-      const modal = buildOwnerRequestModal();
-      return interaction.showModal(modal);
-    }
-
-    // -------------------------------------------------
-    // OWNER: SPECIFIC USER SELECT
-    // -------------------------------------------------
-    if (
-      interaction.isUserSelectMenu() &&
-      interaction.customId === 'owner_report_specific_user'
-    ) {
-      const draft = ownerDrafts.get(interaction.user.id);
-
-      if (!draft) {
-        return interaction.reply({
-          content: '❌ This request session expired. Start again.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const selectedUserId = interaction.values[0];
-      const selectedMember =
-        interaction.guild.members.cache.get(selectedUserId) ||
-        (await interaction.guild.members.fetch(selectedUserId).catch(() => null));
-
-      if (!selectedMember) {
-        return interaction.reply({
-          content: '❌ I could not find that member.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const requiredRole =
-        draft.targetMode === 'senior_member'
-          ? SENIOR_STAFF_ROLE_ID
-          : GENERAL_STAFF_ROLE_ID;
-
-      if (!selectedMember.roles.cache.has(requiredRole)) {
-        return interaction.reply({
-          content:
-            draft.targetMode === 'senior_member'
-              ? '❌ That user does not have the Senior Staff role.'
-              : '❌ That user does not have the General Staff role.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      draft.targetUserId = selectedUserId;
-      ownerDrafts.set(interaction.user.id, draft);
-
-      const modal = buildOwnerRequestModal();
-      return interaction.showModal(modal);
-    }
-
-    // -------------------------------------------------
-    // OWNER: REQUEST DETAILS MODAL
-    // -------------------------------------------------
-    if (
-      interaction.isModalSubmit() &&
-      interaction.customId === 'owner_request_details_modal'
-    ) {
-      const draft = ownerDrafts.get(interaction.user.id);
-
-      if (!draft) {
-        return interaction.reply({
-          content: '❌ This request session expired. Start again.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const reportQuestion = interaction.fields
-        .getTextInputValue('report_question')
-        .trim();
-
-      const hoursText = interaction.fields
-        .getTextInputValue('hours_until_due')
-        .trim();
-
-      const hoursUntilDue = parseHours(hoursText);
-
-      if (hoursUntilDue === null || hoursUntilDue < 24) {
-        return interaction.reply({
-          content:
-            '❌ The deadline must be a number of hours and must be **at least 24 hours**.\nExample: `24`, `48`, or `72`.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      draft.reportQuestion = reportQuestion;
-      draft.hoursUntilDue = hoursUntilDue;
-      ownerDrafts.set(interaction.user.id, draft);
-
-      const targets = await getTargetMembers(interaction.guild, draft);
-
-      if (targets.length === 0) {
-        return interaction.reply({
-          content: '❌ No matching staff members were found.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const dueUnix = Math.floor(
-        (Date.now() + hoursUntilDue * 60 * 60 * 1000) / 1000
+  const messages =
+    await channel.messages
+      .fetch({
+        limit: 50,
+      })
+      .catch(
+        () => null
       );
 
-      const targetText =
-        draft.targetMode === 'senior_member' ||
-        draft.targetMode === 'general_member'
-          ? `<@${draft.targetUserId}>`
-          : draft.targetMode === 'all_senior'
-          ? 'All Senior Staff'
-          : draft.targetMode === 'all_general'
-          ? 'All General Staff'
-          : 'All Senior Staff + General Staff';
-
-      const embed = new EmbedBuilder()
-        .setTitle('✅ Confirm Report Request')
-        .setDescription(
-          [
-            `**Who:** ${targetText}`,
-            `**Report needed:** ${reportQuestion}`,
-            `**Deadline:** ${discordTime(dueUnix)}`,
-            `**People receiving request:** ${targets.length}`,
-            '',
-            'Click **Confirm Request** to create the private report channel(s).',
-          ].join('\n')
-        );
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('owner_confirm_request')
-          .setLabel('Confirm Request')
-          .setStyle(ButtonStyle.Success)
-          .setEmoji('✅'),
-        new ButtonBuilder()
-          .setCustomId('owner_cancel_request')
-          .setLabel('Cancel')
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji('✖️')
-      );
-
-      return interaction.reply({
-        embeds: [embed],
-        components: [row],
-        flags: MessageFlags.Ephemeral,
-      });
-    }
-
-    // -------------------------------------------------
-    // OWNER: CONFIRM REQUEST
-    // -------------------------------------------------
-    if (interaction.isButton() && interaction.customId === 'owner_confirm_request') {
-      const draft = ownerDrafts.get(interaction.user.id);
-
-      if (!draft) {
-        return interaction.reply({
-          content: '❌ This request session expired. Start again.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      await interaction.deferUpdate();
-
-      const targets = await getTargetMembers(interaction.guild, draft);
-
-      if (targets.length === 0) {
-        ownerDrafts.delete(interaction.user.id);
-        return interaction.editReply({
-          content: '❌ No matching staff members were found.',
-          embeds: [],
-          components: [],
-        });
-      }
-
-      const created = [];
-      const failed = [];
-
-      for (const targetMember of targets) {
-        try {
-          const channel = await createRequestedReportChannel({
-            guild: interaction.guild,
-            targetMember,
-            requesterId: interaction.user.id,
-            reportQuestion: draft.reportQuestion,
-            hoursUntilDue: draft.hoursUntilDue,
-          });
-
-          created.push(channel);
-        } catch (error) {
-          console.error(`Failed to create report channel for ${targetMember.id}:`, error);
-          failed.push(targetMember);
-        }
-      }
-
-      ownerDrafts.delete(interaction.user.id);
-
-      return interaction.editReply({
-        content: [
-          `✅ Created **${created.length}** report request channel(s).`,
-          failed.length > 0
-            ? `⚠️ Failed for **${failed.length}** member(s). Check bot permissions.`
-            : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        embeds: [],
-        components: [],
-      });
-    }
-
-    // -------------------------------------------------
-    // OWNER: CANCEL REQUEST
-    // -------------------------------------------------
-    if (interaction.isButton() && interaction.customId === 'owner_cancel_request') {
-      ownerDrafts.delete(interaction.user.id);
-
-      return interaction.update({
-        content: '❌ Report request cancelled.',
-        embeds: [],
-        components: [],
-      });
-    }
-
-    // -------------------------------------------------
-    // REQUESTED REPORT: OPEN SUBMISSION MODAL
-    // -------------------------------------------------
-    if (
-      interaction.isButton() &&
-      interaction.customId.startsWith('submit_requested_report:')
-    ) {
-      const requestId = interaction.customId.split(':')[1];
-      const request = data.requests[requestId];
-
-      if (!request || request.status !== 'open') {
-        return interaction.reply({
-          content: '❌ This report request is no longer open.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      if (interaction.user.id !== request.targetUserId) {
-        return interaction.reply({
-          content: '❌ Only the staff member assigned to this report can submit it.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const modal = new ModalBuilder()
-        .setCustomId(`requested_report_submit_modal:${requestId}`)
-        .setTitle('Submit Staff Report');
-
-      const reportBody = new TextInputBuilder()
-        .setCustomId('report_body')
-        .setLabel('Your report')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true)
-        .setMaxLength(4000)
-        .setPlaceholder('Write the completed report here...');
-
-      const nextReport = new TextInputBuilder()
-        .setCustomId('next_report_schedule')
-        .setLabel('When should another report be requested?')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMaxLength(100)
-        .setPlaceholder('Example: 7 days, weekly, 30 days, or none');
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(reportBody),
-        new ActionRowBuilder().addComponents(nextReport)
-      );
-
-      return interaction.showModal(modal);
-    }
-
-    // -------------------------------------------------
-    // REQUESTED REPORT: SUBMIT
-    // -------------------------------------------------
-    if (
-      interaction.isModalSubmit() &&
-      interaction.customId.startsWith('requested_report_submit_modal:')
-    ) {
-      const requestId = interaction.customId.split(':')[1];
-      const request = data.requests[requestId];
-
-      if (!request || request.status !== 'open') {
-        return interaction.reply({
-          content: '❌ This report request is no longer open.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      if (interaction.user.id !== request.targetUserId) {
-        return interaction.reply({
-          content: '❌ You are not assigned to this report.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const reportBody = interaction.fields.getTextInputValue('report_body').trim();
-      const nextReportSchedule = interaction.fields
-        .getTextInputValue('next_report_schedule')
-        .trim();
-
-      const submittedChannel = await fetchChannel(
-        interaction.guild,
-        SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID
-      );
-
-      if (!submittedChannel || !submittedChannel.isTextBased()) {
-        return interaction.reply({
-          content: '❌ The submitted reports channel is missing.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const dueUnix = Math.floor(request.dueAt / 1000);
-
-      const embed = new EmbedBuilder()
-        .setTitle('📥 Submitted Requested Report')
-        .setDescription(reportBody)
-        .addFields(
-          {
-            name: 'Staff Member',
-            value: `<@${interaction.user.id}>`,
-            inline: true,
-          },
-          {
-            name: 'Requested By',
-            value: `<@${request.requesterId}>`,
-            inline: true,
-          },
-          {
-            name: 'Original Deadline',
-            value: discordTime(dueUnix),
-            inline: false,
-          },
-          {
-            name: 'Report Request',
-            value: request.reportQuestion,
-            inline: false,
-          },
-          {
-            name: 'Next Report',
-            value: nextReportSchedule,
-            inline: false,
-          }
+  const oldPanel =
+    messages?.find(
+      message =>
+        message.author.id ===
+          client.user.id &&
+        message.components.some(
+          row =>
+            row.components.some(
+              component =>
+                component.customId ===
+                'create_senior_report'
+            )
         )
-        .setFooter({ text: `Request ID: ${requestId}` })
-        .setTimestamp();
+    );
 
-      await submittedChannel.send({
-        content: `<@${request.requesterId}>`,
-        embeds: [embed],
-      });
-
-      const recurrenceMs = parseRecurrenceToMs(nextReportSchedule);
-
-      if (recurrenceMs) {
-        const originalHours = Math.max(
-          24,
-          Math.round((request.dueAt - request.createdAt) / (60 * 60 * 1000))
-        );
-
-        await queueRecurringRequest({
-          guildId: interaction.guild.id,
-          targetUserId: request.targetUserId,
-          requesterId: request.requesterId,
-          reportQuestion: request.reportQuestion,
-          recurrenceText: nextReportSchedule,
-          recurrenceMs,
-          dueHours: originalHours,
-        });
-      }
-
-      request.status = 'submitted';
-      request.submittedAt = Date.now();
-      request.nextReportSchedule = nextReportSchedule;
-      saveData();
-
-      await interaction.reply({
-        content: recurrenceMs
-          ? '✅ Report submitted. A future report request was scheduled based on your answer.'
-          : '✅ Report submitted.',
-        flags: MessageFlags.Ephemeral,
-      });
-
-      const channel = interaction.channel;
-
-      setTimeout(async () => {
-        if (channel && channel.deletable) {
-          await channel
-            .delete(`Staff report ${requestId} was submitted`)
-            .catch(console.error);
-        }
-      }, 3000);
-
-      return;
-    }
-
-    // -------------------------------------------------
-    // STAFF-CREATED REPORT: OPEN MODAL
-    // -------------------------------------------------
-    if (interaction.isButton() && interaction.customId === 'staff_create_report') {
-      const member =
-        interaction.guild.members.cache.get(interaction.user.id) ||
-        (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
-
-      if (!isStaff(member)) {
-        return interaction.reply({
-          content: '❌ Only General Staff or Senior Staff can create reports here.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const modal = new ModalBuilder()
-        .setCustomId('staff_created_report_modal')
-        .setTitle('Create Staff Report');
-
-      const title = new TextInputBuilder()
-        .setCustomId('staff_report_title')
-        .setLabel('Report title / topic')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setMaxLength(150)
-        .setPlaceholder('What is this report about?');
-
-      const body = new TextInputBuilder()
-        .setCustomId('staff_report_body')
-        .setLabel('Report')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true)
-        .setMaxLength(4000)
-        .setPlaceholder('Write your report here...');
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(title),
-        new ActionRowBuilder().addComponents(body)
-      );
-
-      return interaction.showModal(modal);
-    }
-
-    // -------------------------------------------------
-    // STAFF-CREATED REPORT: SUBMIT
-    // -------------------------------------------------
-    if (
-      interaction.isModalSubmit() &&
-      interaction.customId === 'staff_created_report_modal'
-    ) {
-      const member =
-        interaction.guild.members.cache.get(interaction.user.id) ||
-        (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
-
-      if (!isStaff(member)) {
-        return interaction.reply({
-          content: '❌ Only staff can submit this report.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const title = interaction.fields.getTextInputValue('staff_report_title').trim();
-      const body = interaction.fields.getTextInputValue('staff_report_body').trim();
-
-      const destination = await fetchChannel(
-        interaction.guild,
-        STAFF_CREATED_REPORTS_CHANNEL_ID
-      );
-
-      if (!destination || !destination.isTextBased()) {
-        return interaction.reply({
-          content: '❌ The staff-created reports destination channel is missing.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      const roleName = member.roles.cache.has(SENIOR_STAFF_ROLE_ID)
-        ? 'Senior Staff'
-        : 'General Staff';
-
-      const embed = new EmbedBuilder()
-        .setTitle(`📄 ${title}`)
-        .setDescription(body)
-        .addFields(
-          {
-            name: 'Submitted By',
-            value: `<@${interaction.user.id}>`,
-            inline: true,
-          },
-          {
-            name: 'Staff Group',
-            value: roleName,
-            inline: true,
-          }
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        '📋 Senior Staff Reports'
+      )
+      .setDescription(
+        [
+          'This panel is for **Senior Staff**.',
+          '',
+          'Use this button to submit a report directly to the **Owner and Co-Owner**.',
+        ].join(
+          '\n'
         )
-        .setTimestamp();
+      );
 
-      await destination.send({ embeds: [embed] });
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'create_senior_report'
+          )
+          .setLabel(
+            'Create Senior Staff Report'
+          )
+          .setEmoji('📋')
+          .setStyle(
+            ButtonStyle.Success
+          )
+      );
 
-      return interaction.reply({
-        content: '✅ Your report was submitted.',
-        flags: MessageFlags.Ephemeral,
-      });
-    }
-  } catch (error) {
-    console.error('❌ Interaction error:', error);
+  if (oldPanel) {
+    await oldPanel.edit({
+      embeds:
+        [embed],
 
-    if (interaction.deferred || interaction.replied) {
-      await interaction
-        .followUp({
-          content: '❌ Something went wrong. Check the bot console for details.',
-          flags: MessageFlags.Ephemeral,
-        })
-        .catch(() => {});
-    } else {
-      await interaction
-        .reply({
-          content: '❌ Something went wrong. Check the bot console for details.',
-          flags: MessageFlags.Ephemeral,
-        })
-        .catch(() => {});
-    }
+      components:
+        [row],
+    });
+  } else {
+    await channel.send({
+      embeds:
+        [embed],
+
+      components:
+        [row],
+    });
   }
-});
+}
 
 // =====================================================
-// MODAL BUILDERS
+// OWNER REQUEST DETAILS MODAL
 // =====================================================
 
-function buildOwnerRequestModal() {
-  const modal = new ModalBuilder()
-    .setCustomId('owner_request_details_modal')
-    .setTitle('Request a Staff Report');
+function createRequestModal() {
+  const modal =
+    new ModalBuilder()
+      .setCustomId(
+        'report_request_details'
+      )
+      .setTitle(
+        'Request Staff Report'
+      );
 
-  const reportQuestion = new TextInputBuilder()
-    .setCustomId('report_question')
-    .setLabel('What report do you need?')
-    .setStyle(TextInputStyle.Paragraph)
-    .setRequired(true)
-    .setMaxLength(1000)
-    .setPlaceholder('Explain exactly what information you need in the report.');
+  const reportQuestion =
+    new TextInputBuilder()
+      .setCustomId(
+        'report_question'
+      )
+      .setLabel(
+        'What report do you need?'
+      )
+      .setStyle(
+        TextInputStyle.Paragraph
+      )
+      .setRequired(true)
+      .setMaxLength(1500)
+      .setPlaceholder(
+        'Explain exactly what you need the staff member to report.'
+      );
 
-  const hoursUntilDue = new TextInputBuilder()
-    .setCustomId('hours_until_due')
-    .setLabel('Hours until due — minimum 24')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(10)
-    .setPlaceholder('Example: 24, 48, 72');
+  const deadline =
+    new TextInputBuilder()
+      .setCustomId(
+        'report_deadline'
+      )
+      .setLabel(
+        'Hours until due — minimum 24'
+      )
+      .setStyle(
+        TextInputStyle.Short
+      )
+      .setRequired(true)
+      .setMaxLength(10)
+      .setPlaceholder(
+        'Example: 24, 48, 72'
+      );
 
   modal.addComponents(
-    new ActionRowBuilder().addComponents(reportQuestion),
-    new ActionRowBuilder().addComponents(hoursUntilDue)
+    new ActionRowBuilder()
+      .addComponents(
+        reportQuestion
+      ),
+
+    new ActionRowBuilder()
+      .addComponents(
+        deadline
+      )
   );
 
   return modal;
 }
 
 // =====================================================
+// CREATE PRIVATE REQUEST CHANNEL
+// =====================================================
+
+async function createPrivateRequestedReport({
+  guild,
+  targetMember,
+  requesterId,
+  reportQuestion,
+  hoursUntilDue,
+}) {
+  const requestId =
+    createRequestId();
+
+  const createdAt =
+    Date.now();
+
+  const dueAt =
+    createdAt +
+    (
+      hoursUntilDue *
+      60 *
+      60 *
+      1000
+    );
+
+  const requester =
+    await getMember(
+      guild,
+      requesterId
+    );
+
+  const channelName =
+    sanitizeChannelName(
+      `report-${targetMember.user.username}-${String(
+        requestId
+      ).slice(-5)}`
+    );
+
+  const permissions = [
+    {
+      id:
+        guild.roles.everyone.id,
+
+      deny: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+      ],
+    },
+
+    {
+      id:
+        targetMember.id,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    },
+
+    {
+      id:
+        guild.ownerId,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+
+        PermissionsBitField
+          .Flags.ManageChannels,
+      ],
+    },
+  ];
+
+  if (OWNER_ROLE_ID) {
+    permissions.push({
+      id:
+        OWNER_ROLE_ID,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
+  if (CO_OWNER_ROLE_ID) {
+    permissions.push({
+      id:
+        CO_OWNER_ROLE_ID,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
+  if (
+    requester &&
+    requester.id !==
+      guild.ownerId
+  ) {
+    permissions.push({
+      id:
+        requester.id,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
+  const channel =
+    await guild.channels.create({
+      name:
+        channelName,
+
+      type:
+        ChannelType.GuildText,
+
+      parent:
+        REQUESTED_REPORTS_CATEGORY_ID,
+
+      permissionOverwrites:
+        permissions,
+
+      reason:
+        `Requested staff report for ${targetMember.user.tag}`,
+    });
+
+  data.requests[
+    requestId
+  ] = {
+    requestId,
+
+    guildId:
+      guild.id,
+
+    channelId:
+      channel.id,
+
+    targetUserId:
+      targetMember.id,
+
+    requesterId,
+
+    reportQuestion,
+
+    createdAt,
+
+    dueAt,
+
+    status:
+      'open',
+  };
+
+  saveData();
+
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        '📋 Staff Report Requested'
+      )
+      .setDescription(
+        [
+          `${targetMember}, you have been requested to complete a report.`,
+          '',
+          `**Requested By:** <@${requesterId}>`,
+          '',
+          '**Report Needed:**',
+          reportQuestion,
+          '',
+          `**Deadline:** ${makeDiscordTimestamp(
+            dueAt
+          )}`,
+          '',
+          'When your report is complete, click **Submit Report**.',
+        ].join(
+          '\n'
+        )
+      )
+      .setFooter({
+        text:
+          `Request ID: ${requestId}`,
+      });
+
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            `submit_requested_report:${requestId}`
+          )
+          .setLabel(
+            'Submit Report'
+          )
+          .setEmoji('✅')
+          .setStyle(
+            ButtonStyle.Success
+          )
+      );
+
+  await channel.send({
+    content:
+      `<@${targetMember.id}>`,
+
+    embeds:
+      [embed],
+
+    components:
+      [row],
+  });
+
+  return channel;
+}
+
+// =====================================================
+// BOT READY
+// =====================================================
+
+client.once(
+  Events.ClientReady,
+
+  async () => {
+    console.log(
+      `✅ Logged in as ${client.user.tag}`
+    );
+
+    const guild =
+      client.guilds.cache.get(
+        GUILD_ID
+      ) ||
+      await client.guilds
+        .fetch(GUILD_ID)
+        .catch(
+          () => null
+        );
+
+    if (!guild) {
+      console.error(
+        '❌ Discord server could not be found.'
+      );
+
+      return;
+    }
+
+    try {
+      await createOwnerPanel(
+        guild
+      );
+
+      await createGeneralStaffPanel(
+        guild
+      );
+
+      await createSeniorStaffPanel(
+        guild
+      );
+
+      console.log(
+        '✅ Staff Reports panels are ready.'
+      );
+    } catch (error) {
+      console.error(
+        '❌ Panel setup error:',
+        error
+      );
+    }
+  }
+);
+
+// =====================================================
+// INTERACTIONS
+// =====================================================
+
+client.on(
+  Events.InteractionCreate,
+
+  async interaction => {
+    try {
+      if (
+        !interaction.guild ||
+        interaction.guild.id !==
+          GUILD_ID
+      ) {
+        return;
+      }
+
+      // =================================================
+      // OWNER / CO-OWNER REQUEST REPORT
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          'request_staff_report'
+      ) {
+        const member =
+          await getMember(
+            interaction.guild,
+            interaction.user.id
+          );
+
+        if (
+          !canRequestReports(
+            member,
+            interaction.guild
+          )
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Only the Owner or Co-Owner can request reports.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        requestDrafts.set(
+          interaction.user.id,
+          {
+            requesterId:
+              interaction.user.id,
+
+            targetMode:
+              null,
+
+            targetUserIds:
+              [],
+          }
+        );
+
+        const menu =
+          new StringSelectMenuBuilder()
+            .setCustomId(
+              'choose_report_target'
+            )
+            .setPlaceholder(
+              'Choose who needs to make the report'
+            )
+            .addOptions([
+              {
+                label:
+                  'One Senior Staff Member',
+
+                value:
+                  'one_senior',
+
+                emoji:
+                  '👤',
+              },
+
+              {
+                label:
+                  'One General Staff Member',
+
+                value:
+                  'one_general',
+
+                emoji:
+                  '👤',
+              },
+
+              {
+                label:
+                  'Select Certain Staff Members',
+
+                description:
+                  'Choose multiple specific staff members',
+
+                value:
+                  'selected_staff',
+
+                emoji:
+                  '🎯',
+              },
+
+              {
+                label:
+                  'All Senior Staff',
+
+                value:
+                  'all_senior',
+
+                emoji:
+                  '👥',
+              },
+
+              {
+                label:
+                  'All General Staff',
+
+                value:
+                  'all_general',
+
+                emoji:
+                  '👥',
+              },
+
+              {
+                label:
+                  'Both Staff Groups',
+
+                value:
+                  'both_groups',
+
+                emoji:
+                  '📣',
+              },
+            ]);
+
+        return interaction.reply({
+          content:
+            '**Step 1:** Choose who needs to make the report.',
+
+          components: [
+            new ActionRowBuilder()
+              .addComponents(
+                menu
+              ),
+          ],
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+      }
+
+      // =================================================
+      // REPORT TARGET TYPE
+      // =================================================
+
+      if (
+        interaction.isStringSelectMenu() &&
+        interaction.customId ===
+          'choose_report_target'
+      ) {
+        const draft =
+          requestDrafts.get(
+            interaction.user.id
+          );
+
+        if (!draft) {
+          return interaction.reply({
+            content:
+              '❌ Your report request expired. Start again.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const mode =
+          interaction.values[0];
+
+        draft.targetMode =
+          mode;
+
+        draft.targetUserIds =
+          [];
+
+        requestDrafts.set(
+          interaction.user.id,
+          draft
+        );
+
+        // ONE SENIOR
+        if (
+          mode ===
+          'one_senior'
+        ) {
+          const selector =
+            new UserSelectMenuBuilder()
+              .setCustomId(
+                'select_one_senior'
+              )
+              .setPlaceholder(
+                'Select one Senior Staff member'
+              )
+              .setMinValues(1)
+              .setMaxValues(1);
+
+          return interaction.update({
+            content:
+              '**Step 2:** Select one Senior Staff member.',
+
+            components: [
+              new ActionRowBuilder()
+                .addComponents(
+                  selector
+                ),
+            ],
+          });
+        }
+
+        // ONE GENERAL
+        if (
+          mode ===
+          'one_general'
+        ) {
+          const selector =
+            new UserSelectMenuBuilder()
+              .setCustomId(
+                'select_one_general'
+              )
+              .setPlaceholder(
+                'Select one General Staff member'
+              )
+              .setMinValues(1)
+              .setMaxValues(1);
+
+          return interaction.update({
+            content:
+              '**Step 2:** Select one General Staff member.',
+
+            components: [
+              new ActionRowBuilder()
+                .addComponents(
+                  selector
+                ),
+            ],
+          });
+        }
+
+        // CERTAIN STAFF
+        if (
+          mode ===
+          'selected_staff'
+        ) {
+          const selector =
+            new UserSelectMenuBuilder()
+              .setCustomId(
+                'select_multiple_staff'
+              )
+              .setPlaceholder(
+                'Select the staff members'
+              )
+              .setMinValues(1)
+              .setMaxValues(25);
+
+          return interaction.update({
+            content:
+              '**Step 2:** Select the specific Senior Staff and/or General Staff members.\n\nYou can select multiple people.',
+
+            components: [
+              new ActionRowBuilder()
+                .addComponents(
+                  selector
+                ),
+            ],
+          });
+        }
+
+        // GROUP OPTIONS
+        return interaction.showModal(
+          createRequestModal()
+        );
+      }
+
+      // =================================================
+      // SELECT ONE SENIOR
+      // =================================================
+
+      if (
+        interaction.isUserSelectMenu() &&
+        interaction.customId ===
+          'select_one_senior'
+      ) {
+        const draft =
+          requestDrafts.get(
+            interaction.user.id
+          );
+
+        if (!draft) {
+          return interaction.reply({
+            content:
+              '❌ Request expired.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const userId =
+          interaction.values[0];
+
+        const member =
+          await getMember(
+            interaction.guild,
+            userId
+          );
+
+        if (
+          !member ||
+          !isSeniorStaff(member)
+        ) {
+          return interaction.reply({
+            content:
+              '❌ That person does not have the Senior Staff role.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        draft.targetUserIds =
+          [userId];
+
+        requestDrafts.set(
+          interaction.user.id,
+          draft
+        );
+
+        return interaction.showModal(
+          createRequestModal()
+        );
+      }
+
+      // =================================================
+      // SELECT ONE GENERAL
+      // =================================================
+
+      if (
+        interaction.isUserSelectMenu() &&
+        interaction.customId ===
+          'select_one_general'
+      ) {
+        const draft =
+          requestDrafts.get(
+            interaction.user.id
+          );
+
+        if (!draft) {
+          return interaction.reply({
+            content:
+              '❌ Request expired.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const userId =
+          interaction.values[0];
+
+        const member =
+          await getMember(
+            interaction.guild,
+            userId
+          );
+
+        if (
+          !member ||
+          !isGeneralStaff(member)
+        ) {
+          return interaction.reply({
+            content:
+              '❌ That person does not have the General Staff role.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        draft.targetUserIds =
+          [userId];
+
+        requestDrafts.set(
+          interaction.user.id,
+          draft
+        );
+
+        return interaction.showModal(
+          createRequestModal()
+        );
+      }
+
+      // =================================================
+      // SELECT CERTAIN STAFF MEMBERS
+      // =================================================
+
+      if (
+        interaction.isUserSelectMenu() &&
+        interaction.customId ===
+          'select_multiple_staff'
+      ) {
+        const draft =
+          requestDrafts.get(
+            interaction.user.id
+          );
+
+        if (!draft) {
+          return interaction.reply({
+            content:
+              '❌ Request expired.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const validUsers = [];
+
+        const invalidUsers = [];
+
+        for (
+          const userId
+          of interaction.values
+        ) {
+          const member =
+            await getMember(
+              interaction.guild,
+              userId
+            );
+
+          if (
+            member &&
+            isStaff(member)
+          ) {
+            validUsers.push(
+              userId
+            );
+          } else {
+            invalidUsers.push(
+              userId
+            );
+          }
+        }
+
+        if (
+          invalidUsers.length >
+          0
+        ) {
+          return interaction.reply({
+            content:
+              [
+                '❌ These users are not Senior Staff or General Staff:',
+                '',
+                ...invalidUsers.map(
+                  id =>
+                    `<@${id}>`
+                ),
+                '',
+                'Please select only staff members.',
+              ].join(
+                '\n'
+              ),
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        draft.targetUserIds =
+          validUsers;
+
+        requestDrafts.set(
+          interaction.user.id,
+          draft
+        );
+
+        return interaction.showModal(
+          createRequestModal()
+        );
+      }
+
+      // =================================================
+      // OWNER REQUEST DETAILS
+      // =================================================
+
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId ===
+          'report_request_details'
+      ) {
+        const draft =
+          requestDrafts.get(
+            interaction.user.id
+          );
+
+        if (!draft) {
+          return interaction.reply({
+            content:
+              '❌ Your request expired.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const reportQuestion =
+          interaction.fields
+            .getTextInputValue(
+              'report_question'
+            )
+            .trim();
+
+        const hours =
+          parseHours(
+            interaction.fields
+              .getTextInputValue(
+                'report_deadline'
+              )
+          );
+
+        if (
+          hours === null ||
+          hours < 24
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Deadline must be at least **24 hours**.\n\nExamples: `24`, `48`, `72`',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        draft.reportQuestion =
+          reportQuestion;
+
+        draft.hoursUntilDue =
+          hours;
+
+        requestDrafts.set(
+          interaction.user.id,
+          draft
+        );
+
+        const targets =
+          await getTargets(
+            interaction.guild,
+            draft
+          );
+
+        if (
+          targets.length ===
+          0
+        ) {
+          return interaction.reply({
+            content:
+              '❌ No valid staff members were found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const dueAt =
+          Date.now() +
+          (
+            hours *
+            60 *
+            60 *
+            1000
+          );
+
+        const people =
+          targets
+            .map(
+              member =>
+                `<@${member.id}>`
+            )
+            .join(
+              ', '
+            );
+
+        const embed =
+          new EmbedBuilder()
+            .setTitle(
+              '✅ Confirm Report Request'
+            )
+            .setDescription(
+              [
+                '**Who:**',
+                people,
+                '',
+                '**Report Needed:**',
+                reportQuestion,
+                '',
+                `**Deadline:** ${makeDiscordTimestamp(
+                  dueAt
+                )}`,
+                '',
+                `**People Receiving Request:** ${targets.length}`,
+              ].join(
+                '\n'
+              )
+            );
+
+        const row =
+          new ActionRowBuilder()
+            .addComponents(
+              new ButtonBuilder()
+                .setCustomId(
+                  'confirm_report_request'
+                )
+                .setLabel(
+                  'Confirm Request'
+                )
+                .setEmoji('✅')
+                .setStyle(
+                  ButtonStyle.Success
+                ),
+
+              new ButtonBuilder()
+                .setCustomId(
+                  'cancel_report_request'
+                )
+                .setLabel(
+                  'Cancel'
+                )
+                .setEmoji('❌')
+                .setStyle(
+                  ButtonStyle.Danger
+                )
+            );
+
+        return interaction.reply({
+          embeds:
+            [embed],
+
+          components:
+            [row],
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+      }
+
+      // =================================================
+      // CONFIRM REQUEST
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          'confirm_report_request'
+      ) {
+        const draft =
+          requestDrafts.get(
+            interaction.user.id
+          );
+
+        if (!draft) {
+          return interaction.reply({
+            content:
+              '❌ Request expired.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        await interaction.deferUpdate();
+
+        const targets =
+          await getTargets(
+            interaction.guild,
+            draft
+          );
+
+        let created =
+          0;
+
+        let failed =
+          0;
+
+        for (
+          const target
+          of targets
+        ) {
+          try {
+            await createPrivateRequestedReport({
+              guild:
+                interaction.guild,
+
+              targetMember:
+                target,
+
+              requesterId:
+                interaction.user.id,
+
+              reportQuestion:
+                draft.reportQuestion,
+
+              hoursUntilDue:
+                draft.hoursUntilDue,
+            });
+
+            created++;
+          } catch (error) {
+            failed++;
+
+            console.error(
+              `❌ Failed to create report for ${target.user.tag}:`,
+              error
+            );
+          }
+        }
+
+        requestDrafts.delete(
+          interaction.user.id
+        );
+
+        return interaction.editReply({
+          content:
+            [
+              `✅ Created **${created}** report request(s).`,
+
+              failed > 0
+                ? `⚠️ **${failed}** failed. Check bot permissions.`
+                : null,
+            ]
+              .filter(
+                Boolean
+              )
+              .join(
+                '\n'
+              ),
+
+          embeds:
+            [],
+
+          components:
+            [],
+        });
+      }
+
+      // =================================================
+      // CANCEL OWNER REQUEST
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          'cancel_report_request'
+      ) {
+        requestDrafts.delete(
+          interaction.user.id
+        );
+
+        return interaction.update({
+          content:
+            '❌ Report request cancelled.',
+
+          embeds:
+            [],
+
+          components:
+            [],
+        });
+      }
+
+      // =================================================
+      // SUBMIT REQUESTED REPORT BUTTON
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId.startsWith(
+          'submit_requested_report:'
+        )
+      ) {
+        const requestId =
+          interaction.customId.split(
+            ':'
+          )[1];
+
+        const request =
+          data.requests[
+            requestId
+          ];
+
+        if (
+          !request ||
+          request.status !==
+            'open'
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This report is no longer open.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        if (
+          interaction.user.id !==
+          request.targetUserId
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Only the assigned staff member can submit this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const modal =
+          new ModalBuilder()
+            .setCustomId(
+              `requested_report_submission:${requestId}`
+            )
+            .setTitle(
+              'Submit Requested Report'
+            );
+
+        const report =
+          new TextInputBuilder()
+            .setCustomId(
+              'requested_report_body'
+            )
+            .setLabel(
+              'Completed Report'
+            )
+            .setStyle(
+              TextInputStyle.Paragraph
+            )
+            .setRequired(true)
+            .setMaxLength(4000)
+            .setPlaceholder(
+              'Write your completed report here...'
+            );
+
+        const nextReport =
+          new TextInputBuilder()
+            .setCustomId(
+              'next_report_time'
+            )
+            .setLabel(
+              'When should another report be requested?'
+            )
+            .setStyle(
+              TextInputStyle.Short
+            )
+            .setRequired(true)
+            .setMaxLength(100)
+            .setPlaceholder(
+              'Example: weekly, 7 days, 30 days, none'
+            );
+
+        modal.addComponents(
+          new ActionRowBuilder()
+            .addComponents(
+              report
+            ),
+
+          new ActionRowBuilder()
+            .addComponents(
+              nextReport
+            )
+        );
+
+        return interaction.showModal(
+          modal
+        );
+      }
+
+      // =================================================
+      // SUBMIT REQUESTED REPORT
+      // =================================================
+
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith(
+          'requested_report_submission:'
+        )
+      ) {
+        const requestId =
+          interaction.customId.split(
+            ':'
+          )[1];
+
+        const request =
+          data.requests[
+            requestId
+          ];
+
+        if (
+          !request ||
+          request.status !==
+            'open'
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This report is no longer open.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        if (
+          interaction.user.id !==
+          request.targetUserId
+        ) {
+          return interaction.reply({
+            content:
+              '❌ You are not assigned to this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const reportBody =
+          interaction.fields
+            .getTextInputValue(
+              'requested_report_body'
+            )
+            .trim();
+
+        const nextReportTime =
+          interaction.fields
+            .getTextInputValue(
+              'next_report_time'
+            )
+            .trim();
+
+        const destination =
+          await getChannel(
+            interaction.guild,
+            SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID
+          );
+
+        if (
+          !destination ||
+          !destination.isTextBased()
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Submitted reports channel could not be found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const embed =
+          new EmbedBuilder()
+            .setTitle(
+              '📥 Submitted Requested Report'
+            )
+            .setDescription(
+              reportBody
+            )
+            .addFields(
+              {
+                name:
+                  'Submitted By',
+
+                value:
+                  `<@${interaction.user.id}>`,
+
+                inline:
+                  true,
+              },
+
+              {
+                name:
+                  'Requested By',
+
+                value:
+                  `<@${request.requesterId}>`,
+
+                inline:
+                  true,
+              },
+
+              {
+                name:
+                  'Original Request',
+
+                value:
+                  request.reportQuestion,
+              },
+
+              {
+                name:
+                  'Deadline',
+
+                value:
+                  makeDiscordTimestamp(
+                    request.dueAt
+                  ),
+              },
+
+              {
+                name:
+                  'Next Report',
+
+                value:
+                  nextReportTime,
+              }
+            )
+            .setTimestamp();
+
+        await destination.send({
+          content:
+            `<@${request.requesterId}>`,
+
+          embeds:
+            [embed],
+        });
+
+        request.status =
+          'submitted';
+
+        request.submittedAt =
+          Date.now();
+
+        request.nextReport =
+          nextReportTime;
+
+        saveData();
+
+        await interaction.reply({
+          content:
+            '✅ Your report was submitted successfully.',
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+
+        const reportChannel =
+          interaction.channel;
+
+        setTimeout(
+          async () => {
+            if (
+              reportChannel &&
+              reportChannel.deletable
+            ) {
+              await reportChannel
+                .delete(
+                  'Requested report submitted'
+                )
+                .catch(
+                  console.error
+                );
+            }
+          },
+          3000
+        );
+
+        return;
+      }
+
+      // =================================================
+      // GENERAL STAFF CREATE REPORT
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          'create_general_report'
+      ) {
+        const member =
+          await getMember(
+            interaction.guild,
+            interaction.user.id
+          );
+
+        if (
+          !member ||
+          !isGeneralStaff(member)
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This panel is for General Staff only.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const modal =
+          new ModalBuilder()
+            .setCustomId(
+              'general_report_submission'
+            )
+            .setTitle(
+              'General Staff Report'
+            );
+
+        const title =
+          new TextInputBuilder()
+            .setCustomId(
+              'general_report_title'
+            )
+            .setLabel(
+              'Report Title'
+            )
+            .setStyle(
+              TextInputStyle.Short
+            )
+            .setRequired(true)
+            .setMaxLength(150)
+            .setPlaceholder(
+              'What is this report about?'
+            );
+
+        const body =
+          new TextInputBuilder()
+            .setCustomId(
+              'general_report_body'
+            )
+            .setLabel(
+              'Report'
+            )
+            .setStyle(
+              TextInputStyle.Paragraph
+            )
+            .setRequired(true)
+            .setMaxLength(4000)
+            .setPlaceholder(
+              'Write your report for Senior Staff...'
+            );
+
+        modal.addComponents(
+          new ActionRowBuilder()
+            .addComponents(
+              title
+            ),
+
+          new ActionRowBuilder()
+            .addComponents(
+              body
+            )
+        );
+
+        return interaction.showModal(
+          modal
+        );
+      }
+
+      // =================================================
+      // GENERAL STAFF REPORT SUBMISSION
+      // =================================================
+
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId ===
+          'general_report_submission'
+      ) {
+        const member =
+          await getMember(
+            interaction.guild,
+            interaction.user.id
+          );
+
+        if (
+          !member ||
+          !isGeneralStaff(member)
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Only General Staff can submit this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const title =
+          interaction.fields
+            .getTextInputValue(
+              'general_report_title'
+            )
+            .trim();
+
+        const body =
+          interaction.fields
+            .getTextInputValue(
+              'general_report_body'
+            )
+            .trim();
+
+        const destination =
+          await getChannel(
+            interaction.guild,
+            GENERAL_REPORTS_REVIEW_CHANNEL_ID
+          );
+
+        if (
+          !destination ||
+          !destination.isTextBased()
+        ) {
+          return interaction.reply({
+            content:
+              '❌ General Staff review channel could not be found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const embed =
+          new EmbedBuilder()
+            .setTitle(
+              `📄 General Staff Report — ${title}`
+            )
+            .setDescription(
+              body
+            )
+            .addFields(
+              {
+                name:
+                  'Submitted By',
+
+                value:
+                  `<@${interaction.user.id}>`,
+
+                inline:
+                  true,
+              },
+
+              {
+                name:
+                  'Staff Group',
+
+                value:
+                  'General Staff',
+
+                inline:
+                  true,
+              },
+
+              {
+                name:
+                  'Review Status',
+
+                value:
+                  '⏳ Waiting for Senior Staff Review',
+
+                inline:
+                  false,
+              }
+            )
+            .setTimestamp();
+
+        await destination.send({
+          content:
+            `<@&${SENIOR_STAFF_ROLE_ID}>`,
+
+          embeds:
+            [embed],
+
+          allowedMentions: {
+            roles: [
+              SENIOR_STAFF_ROLE_ID,
+            ],
+          },
+        });
+
+        return interaction.reply({
+          content:
+            '✅ Your report was sent to Senior Staff for review.',
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+      }
+
+      // =================================================
+      // SENIOR STAFF CREATE REPORT
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          'create_senior_report'
+      ) {
+        const member =
+          await getMember(
+            interaction.guild,
+            interaction.user.id
+          );
+
+        if (
+          !member ||
+          !isSeniorStaff(member)
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This panel is for Senior Staff only.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const modal =
+          new ModalBuilder()
+            .setCustomId(
+              'senior_report_submission'
+            )
+            .setTitle(
+              'Senior Staff Report'
+            );
+
+        const title =
+          new TextInputBuilder()
+            .setCustomId(
+              'senior_report_title'
+            )
+            .setLabel(
+              'Report Title'
+            )
+            .setStyle(
+              TextInputStyle.Short
+            )
+            .setRequired(true)
+            .setMaxLength(150)
+            .setPlaceholder(
+              'What does the Owner / Co-Owner need to know?'
+            );
+
+        const body =
+          new TextInputBuilder()
+            .setCustomId(
+              'senior_report_body'
+            )
+            .setLabel(
+              'Report'
+            )
+            .setStyle(
+              TextInputStyle.Paragraph
+            )
+            .setRequired(true)
+            .setMaxLength(4000)
+            .setPlaceholder(
+              'Write your report for the Owner / Co-Owner...'
+            );
+
+        modal.addComponents(
+          new ActionRowBuilder()
+            .addComponents(
+              title
+            ),
+
+          new ActionRowBuilder()
+            .addComponents(
+              body
+            )
+        );
+
+        return interaction.showModal(
+          modal
+        );
+      }
+
+      // =================================================
+      // SENIOR STAFF REPORT SUBMISSION
+      // =================================================
+
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId ===
+          'senior_report_submission'
+      ) {
+        const member =
+          await getMember(
+            interaction.guild,
+            interaction.user.id
+          );
+
+        if (
+          !member ||
+          !isSeniorStaff(member)
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Only Senior Staff can submit this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const title =
+          interaction.fields
+            .getTextInputValue(
+              'senior_report_title'
+            )
+            .trim();
+
+        const body =
+          interaction.fields
+            .getTextInputValue(
+              'senior_report_body'
+            )
+            .trim();
+
+        const destination =
+          await getChannel(
+            interaction.guild,
+            SENIOR_REPORTS_DESTINATION_CHANNEL_ID
+          );
+
+        if (
+          !destination ||
+          !destination.isTextBased()
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Senior Staff report destination could not be found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const embed =
+          new EmbedBuilder()
+            .setTitle(
+              `📋 Senior Staff Report — ${title}`
+            )
+            .setDescription(
+              body
+            )
+            .addFields(
+              {
+                name:
+                  'Submitted By',
+
+                value:
+                  `<@${interaction.user.id}>`,
+
+                inline:
+                  true,
+              },
+
+              {
+                name:
+                  'Staff Group',
+
+                value:
+                  'Senior Staff',
+
+                inline:
+                  true,
+              },
+
+              {
+                name:
+                  'For',
+
+                value:
+                  'Owner / Co-Owner',
+
+                inline:
+                  true,
+              }
+            )
+            .setTimestamp();
+
+        const ownerPings = [];
+
+        if (
+          OWNER_ROLE_ID
+        ) {
+          ownerPings.push(
+            `<@&${OWNER_ROLE_ID}>`
+          );
+        }
+
+        if (
+          CO_OWNER_ROLE_ID
+        ) {
+          ownerPings.push(
+            `<@&${CO_OWNER_ROLE_ID}>`
+          );
+        }
+
+        await destination.send({
+          content:
+            ownerPings.length >
+            0
+              ? ownerPings.join(
+                  ' '
+                )
+              : undefined,
+
+          embeds:
+            [embed],
+
+          allowedMentions: {
+            roles: [
+              OWNER_ROLE_ID,
+              CO_OWNER_ROLE_ID,
+            ].filter(
+              Boolean
+            ),
+          },
+        });
+
+        return interaction.reply({
+          content:
+            '✅ Your Senior Staff report was sent to the Owner / Co-Owner.',
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+      }
+    } catch (error) {
+      console.error(
+        '❌ Interaction error:',
+        error
+      );
+
+      if (
+        interaction.replied ||
+        interaction.deferred
+      ) {
+        await interaction
+          .followUp({
+            content:
+              '❌ Something went wrong. Check the bot logs.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          })
+          .catch(
+            () => {}
+          );
+      } else {
+        await interaction
+          .reply({
+            content:
+              '❌ Something went wrong. Check the bot logs.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          })
+          .catch(
+            () => {}
+          );
+      }
+    }
+  }
+);
+
+// =====================================================
 // LOGIN
 // =====================================================
 
-client.login(DISCORD_TOKEN);
+client.login(
+  DISCORD_TOKEN
+);
