@@ -158,7 +158,6 @@ async function ensureMembersLoaded(guild) {
     return memberLoadPromise;
   }
 
-  // Prevent repeated full-member fetches
   if (
     Date.now() - lastMemberLoadAttempt <
     60000
@@ -531,7 +530,6 @@ async function getTargets(
   guild,
   draft
 ) {
-  // One Senior Staff
   if (
     draft.targetMode ===
     'one_senior'
@@ -552,7 +550,6 @@ async function getTargets(
     return [];
   }
 
-  // One General Staff
   if (
     draft.targetMode ===
     'one_general'
@@ -573,7 +570,6 @@ async function getTargets(
     return [];
   }
 
-  // Certain selected staff
   if (
     draft.targetMode ===
     'selected_staff'
@@ -604,7 +600,6 @@ async function getTargets(
     return members;
   }
 
-  // All Senior Staff
   if (
     draft.targetMode ===
     'all_senior'
@@ -626,7 +621,6 @@ async function getTargets(
     );
   }
 
-  // All General Staff
   if (
     draft.targetMode ===
     'all_general'
@@ -648,7 +642,6 @@ async function getTargets(
     );
   }
 
-  // Both Staff Groups
   if (
     draft.targetMode ===
     'both_groups'
@@ -1109,6 +1102,8 @@ async function createPrivateRequestedReport({
       ],
     },
 
+    // Assigned staff member can SEE the report,
+    // but cannot type normal messages.
     {
       id:
         targetMember.id,
@@ -1118,13 +1113,25 @@ async function createPrivateRequestedReport({
           .Flags.ViewChannel,
 
         PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+
+      deny: [
+        PermissionsBitField
           .Flags.SendMessages,
 
         PermissionsBitField
-          .Flags.ReadMessageHistory,
+          .Flags.SendMessagesInThreads,
+
+        PermissionsBitField
+          .Flags.CreatePublicThreads,
+
+        PermissionsBitField
+          .Flags.CreatePrivateThreads,
       ],
     },
 
+    // Server owner can view/manage the report channel.
     {
       id:
         guild.ownerId,
@@ -1240,7 +1247,9 @@ async function createPrivateRequestedReport({
             dueAt
           )}`,
           '',
-          'Click **Submit Report** when finished.',
+          'This channel is **read-only**.',
+          '',
+          'Click **Submit Report** below to complete the report.',
         ].join(
           '\n'
         )
@@ -1304,7 +1313,6 @@ client.once(
       return;
     }
 
-    // Load members ONCE
     await ensureMembersLoaded(
       guild
     );
@@ -1536,10 +1544,6 @@ client.on(
           draft
         );
 
-        // -----------------------------------------------
-        // ONE SENIOR STAFF
-        // -----------------------------------------------
-
         if (
           mode ===
           'one_senior'
@@ -1590,10 +1594,6 @@ client.on(
           });
         }
 
-        // -----------------------------------------------
-        // ONE GENERAL STAFF
-        // -----------------------------------------------
-
         if (
           mode ===
           'one_general'
@@ -1643,10 +1643,6 @@ client.on(
             ],
           });
         }
-
-        // -----------------------------------------------
-        // CERTAIN SELECTED STAFF
-        // -----------------------------------------------
 
         if (
           mode ===
@@ -1702,7 +1698,6 @@ client.on(
           });
         }
 
-        // All Senior / All General / Both
         return interaction.showModal(
           createRequestModal()
         );
@@ -2142,7 +2137,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ Only the assigned staff member can submit this report.',
+              '❌ This report is assigned to someone else. Only the assigned staff member can submit it.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -2170,7 +2165,10 @@ client.on(
               TextInputStyle.Paragraph
             )
             .setRequired(true)
-            .setMaxLength(4000);
+            .setMaxLength(4000)
+            .setPlaceholder(
+              'Type your full report here.'
+            );
 
         const next =
           new TextInputBuilder()
@@ -2350,7 +2348,7 @@ client.on(
 
         await interaction.reply({
           content:
-            '✅ Your report was submitted.',
+            '✅ Your report was submitted successfully.',
 
           flags:
             MessageFlags.Ephemeral,
