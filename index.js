@@ -21,37 +21,61 @@ const fs = require('fs');
 const path = require('path');
 
 // =====================================================
-// CONFIG
+// CRAFTED SMP STAFF REPORTS
 // =====================================================
 
 const GUILD_ID = '1543363950262100118';
 
-// Owner / Co-Owner report request channel
-const REQUEST_REPORT_CHANNEL_ID = '1549136946683576380';
+// =====================================================
+// STAFF ROLES
+// =====================================================
 
-// Roles
 const SENIOR_STAFF_ROLE_ID = '1543367669385011302';
 const GENERAL_STAFF_ROLE_ID = '1543373922668388482';
 
-// Requested report system
+// =====================================================
+// OWNER / CO-OWNER REQUEST SYSTEM
+// =====================================================
+
+// Owner / Co-Owner requests reports here
+const REQUEST_REPORT_CHANNEL_ID = '1549136946683576380';
+
+// Private requested-report channels are created here
 const REQUESTED_REPORTS_CATEGORY_ID = '1549140124854653038';
+
+// Finished requested reports go here
 const SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID = '1549140613788864563';
 
-// General Staff reports
+// =====================================================
+// GENERAL STAFF REPORT SYSTEM
+// =====================================================
+
+// General Staff makes reports here
 const GENERAL_REPORTS_TO_MAKE_CHANNEL_ID = '1549141254653349920';
+
+// General Staff reports are reviewed by Senior Staff here
 const GENERAL_REPORTS_REVIEW_CHANNEL_ID = '1549149758202052818';
 
-// Senior Staff reports
+// =====================================================
+// SENIOR STAFF REPORT SYSTEM
+// =====================================================
+
+// Senior Staff makes reports here
 const SENIOR_REPORTS_TO_MAKE_CHANNEL_ID = '1549148764760055838';
+
+// Senior Staff reports go here for Owner / Co-Owner
 const SENIOR_REPORTS_DESTINATION_CHANNEL_ID = '1549141094388863126';
 
-// Environment variables
+// =====================================================
+// ENVIRONMENT VARIABLES
+// =====================================================
+
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const OWNER_ROLE_ID = process.env.OWNER_ROLE_ID || null;
 const CO_OWNER_ROLE_ID = process.env.CO_OWNER_ROLE_ID || null;
 
 if (!DISCORD_TOKEN) {
-  console.error('❌ Missing DISCORD_TOKEN');
+  console.error('❌ Missing DISCORD_TOKEN.');
   process.exit(1);
 }
 
@@ -59,7 +83,10 @@ if (!DISCORD_TOKEN) {
 // DATA
 // =====================================================
 
-const DATA_FILE = path.join(__dirname, 'staff-reports-data.json');
+const DATA_FILE = path.join(
+  __dirname,
+  'staff-reports-data.json'
+);
 
 function loadData() {
   try {
@@ -70,14 +97,20 @@ function loadData() {
     }
 
     const parsed = JSON.parse(
-      fs.readFileSync(DATA_FILE, 'utf8')
+      fs.readFileSync(
+        DATA_FILE,
+        'utf8'
+      )
     );
 
     return {
       requests: parsed.requests || {},
     };
   } catch (error) {
-    console.error('⚠️ Could not load data:', error);
+    console.error(
+      '⚠️ Could not load data:',
+      error
+    );
 
     return {
       requests: {},
@@ -91,14 +124,83 @@ function saveData() {
   try {
     fs.writeFileSync(
       DATA_FILE,
-      JSON.stringify(data, null, 2)
+      JSON.stringify(
+        data,
+        null,
+        2
+      )
     );
   } catch (error) {
-    console.error('⚠️ Could not save data:', error);
+    console.error(
+      '⚠️ Could not save data:',
+      error
+    );
   }
 }
 
+// Temporary Owner / Co-Owner request sessions
 const requestDrafts = new Map();
+
+// =====================================================
+// MEMBER CACHE CONTROL
+// =====================================================
+
+let membersLoaded = false;
+let memberLoadPromise = null;
+let lastMemberLoadAttempt = 0;
+
+async function ensureMembersLoaded(guild) {
+  if (membersLoaded) {
+    return true;
+  }
+
+  if (memberLoadPromise) {
+    return memberLoadPromise;
+  }
+
+  // Prevent repeated full-member fetches
+  if (
+    Date.now() - lastMemberLoadAttempt <
+    60000
+  ) {
+    return false;
+  }
+
+  lastMemberLoadAttempt = Date.now();
+
+  memberLoadPromise = (async () => {
+    try {
+      console.log(
+        '🔄 Loading server members...'
+      );
+
+      await guild.members.fetch();
+
+      membersLoaded = true;
+
+      console.log(
+        `✅ Loaded ${guild.members.cache.size} members.`
+      );
+
+      return true;
+    } catch (error) {
+      console.error(
+        '❌ Could not load server members:',
+        error
+      );
+
+      console.error(
+        'Make sure SERVER MEMBERS INTENT is enabled.'
+      );
+
+      return false;
+    } finally {
+      memberLoadPromise = null;
+    }
+  })();
+
+  return memberLoadPromise;
+}
 
 // =====================================================
 // CLIENT
@@ -112,19 +214,28 @@ const client = new Client({
 });
 
 // =====================================================
-// PERMISSIONS
+// PERMISSION HELPERS
 // =====================================================
 
-function canRequestReports(member, guild) {
-  if (!member) return false;
+function canRequestReports(
+  member,
+  guild
+) {
+  if (!member) {
+    return false;
+  }
 
-  if (member.id === guild.ownerId) {
+  if (
+    member.id ===
+    guild.ownerId
+  ) {
     return true;
   }
 
   if (
     member.permissions.has(
-      PermissionsBitField.Flags.Administrator
+      PermissionsBitField
+        .Flags.Administrator
     )
   ) {
     return true;
@@ -132,14 +243,18 @@ function canRequestReports(member, guild) {
 
   if (
     OWNER_ROLE_ID &&
-    member.roles.cache.has(OWNER_ROLE_ID)
+    member.roles.cache.has(
+      OWNER_ROLE_ID
+    )
   ) {
     return true;
   }
 
   if (
     CO_OWNER_ROLE_ID &&
-    member.roles.cache.has(CO_OWNER_ROLE_ID)
+    member.roles.cache.has(
+      CO_OWNER_ROLE_ID
+    )
   ) {
     return true;
   }
@@ -150,14 +265,18 @@ function canRequestReports(member, guild) {
 function isSeniorStaff(member) {
   return (
     member &&
-    member.roles.cache.has(SENIOR_STAFF_ROLE_ID)
+    member.roles.cache.has(
+      SENIOR_STAFF_ROLE_ID
+    )
   );
 }
 
 function isGeneralStaff(member) {
   return (
     member &&
-    member.roles.cache.has(GENERAL_STAFF_ROLE_ID)
+    member.roles.cache.has(
+      GENERAL_STAFF_ROLE_ID
+    )
   );
 }
 
@@ -169,51 +288,95 @@ function isStaff(member) {
 }
 
 // =====================================================
-// HELPERS
+// BASIC HELPERS
 // =====================================================
 
-async function getChannel(guild, channelId) {
+async function getChannel(
+  guild,
+  channelId
+) {
   return (
-    guild.channels.cache.get(channelId) ||
-    await guild.channels.fetch(channelId).catch(() => null)
+    guild.channels.cache.get(
+      channelId
+    ) ||
+    await guild.channels
+      .fetch(channelId)
+      .catch(() => null)
   );
 }
 
-async function getMember(guild, userId) {
+async function getMember(
+  guild,
+  userId
+) {
   return (
-    guild.members.cache.get(userId) ||
-    await guild.members.fetch(userId).catch(() => null)
+    guild.members.cache.get(
+      userId
+    ) ||
+    await guild.members
+      .fetch(userId)
+      .catch(() => null)
   );
 }
 
-function makeRequestId() {
-  return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+function createRequestId() {
+  return (
+    Date.now().toString() +
+    '-' +
+    Math.floor(
+      Math.random() *
+      100000
+    )
+  );
 }
 
-function sanitizeChannelName(name) {
+function sanitizeChannelName(
+  name
+) {
   return (
     name
       .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 80) ||
+      .replace(
+        /[^a-z0-9-]/g,
+        '-'
+      )
+      .replace(
+        /-+/g,
+        '-'
+      )
+      .replace(
+        /^-|-$/g,
+        ''
+      )
+      .slice(
+        0,
+        80
+      ) ||
     'staff-report'
   );
 }
 
 function discordTimestamp(ms) {
-  const unix = Math.floor(ms / 1000);
+  const unix =
+    Math.floor(
+      ms / 1000
+    );
 
-  return `<t:${unix}:F> • <t:${unix}:R>`;
+  return (
+    `<t:${unix}:F> • ` +
+    `<t:${unix}:R>`
+  );
 }
 
 function parseHours(value) {
-  const number = Number(
-    String(value).trim()
-  );
+  const number =
+    Number(
+      String(value).trim()
+    );
 
-  if (!Number.isFinite(number)) {
+  if (
+    !Number.isFinite(number)
+  ) {
     return null;
   }
 
@@ -221,28 +384,51 @@ function parseHours(value) {
 }
 
 // =====================================================
-// ROLE-FILTERED DROPDOWNS
+// ROLE-FILTERED STAFF OPTIONS
 // =====================================================
 
-function getRoleOptions(guild, roleId) {
-  const role = guild.roles.cache.get(roleId);
+function getRoleOptions(
+  guild,
+  roleId
+) {
+  const role =
+    guild.roles.cache.get(
+      roleId
+    );
 
   if (!role) {
     return [];
   }
 
-  return [...role.members.values()]
-    .filter(member => !member.user.bot)
+  return [
+    ...role.members.values(),
+  ]
+    .filter(
+      member =>
+        !member.user.bot
+    )
     .slice(0, 25)
-    .map(member => ({
-      label: member.displayName.slice(0, 100),
-      description: member.user.username.slice(0, 100),
-      value: member.id,
-    }));
+    .map(
+      member => ({
+        label:
+          member.displayName
+            .slice(0, 100),
+
+        description:
+          member.user.username
+            .slice(0, 100),
+
+        value:
+          member.id,
+      })
+    );
 }
 
-function getCombinedStaffOptions(guild) {
-  const unique = new Map();
+function getCombinedStaffOptions(
+  guild
+) {
+  const unique =
+    new Map();
 
   const seniorRole =
     guild.roles.cache.get(
@@ -259,7 +445,9 @@ function getCombinedStaffOptions(guild) {
       const member
       of seniorRole.members.values()
     ) {
-      if (!member.user.bot) {
+      if (
+        !member.user.bot
+      ) {
         unique.set(
           member.id,
           member
@@ -273,7 +461,9 @@ function getCombinedStaffOptions(guild) {
       const member
       of generalRole.members.values()
     ) {
-      if (!member.user.bot) {
+      if (
+        !member.user.bot
+      ) {
         unique.set(
           member.id,
           member
@@ -282,45 +472,66 @@ function getCombinedStaffOptions(guild) {
     }
   }
 
-  return [...unique.values()]
+  return [
+    ...unique.values(),
+  ]
     .slice(0, 25)
-    .map(member => {
-      const groups = [];
+    .map(
+      member => {
+        const groups = [];
 
-      if (
-        member.roles.cache.has(
-          SENIOR_STAFF_ROLE_ID
-        )
-      ) {
-        groups.push('Senior Staff');
+        if (
+          member.roles.cache.has(
+            SENIOR_STAFF_ROLE_ID
+          )
+        ) {
+          groups.push(
+            'Senior Staff'
+          );
+        }
+
+        if (
+          member.roles.cache.has(
+            GENERAL_STAFF_ROLE_ID
+          )
+        ) {
+          groups.push(
+            'General Staff'
+          );
+        }
+
+        return {
+          label:
+            member.displayName
+              .slice(
+                0,
+                100
+              ),
+
+          description:
+            groups
+              .join(' + ')
+              .slice(
+                0,
+                100
+              ),
+
+          value:
+            member.id,
+        };
       }
-
-      if (
-        member.roles.cache.has(
-          GENERAL_STAFF_ROLE_ID
-        )
-      ) {
-        groups.push('General Staff');
-      }
-
-      return {
-        label:
-          member.displayName.slice(0, 100),
-
-        description:
-          groups.join(' + ').slice(0, 100),
-
-        value:
-          member.id,
-      };
-    });
+    );
 }
 
 // =====================================================
-// TARGETS
+// GET TARGET MEMBERS
 // =====================================================
 
-async function getTargets(guild, draft) {
+async function getTargets(
+  guild,
+  draft
+) {
+  // One Senior Staff
   if (
     draft.targetMode ===
     'one_senior'
@@ -341,6 +552,7 @@ async function getTargets(guild, draft) {
     return [];
   }
 
+  // One General Staff
   if (
     draft.targetMode ===
     'one_general'
@@ -361,6 +573,7 @@ async function getTargets(guild, draft) {
     return [];
   }
 
+  // Certain selected staff
   if (
     draft.targetMode ===
     'selected_staff'
@@ -382,13 +595,16 @@ async function getTargets(guild, draft) {
         isStaff(member) &&
         !member.user.bot
       ) {
-        members.push(member);
+        members.push(
+          member
+        );
       }
     }
 
     return members;
   }
 
+  // All Senior Staff
   if (
     draft.targetMode ===
     'all_senior'
@@ -410,6 +626,7 @@ async function getTargets(guild, draft) {
     );
   }
 
+  // All General Staff
   if (
     draft.targetMode ===
     'all_general'
@@ -431,10 +648,14 @@ async function getTargets(guild, draft) {
     );
   }
 
+  // Both Staff Groups
   if (
     draft.targetMode ===
     'both_groups'
   ) {
+    const unique =
+      new Map();
+
     const seniorRole =
       guild.roles.cache.get(
         SENIOR_STAFF_ROLE_ID
@@ -445,15 +666,14 @@ async function getTargets(guild, draft) {
         GENERAL_STAFF_ROLE_ID
       );
 
-    const unique =
-      new Map();
-
     if (seniorRole) {
       for (
         const member
         of seniorRole.members.values()
       ) {
-        if (!member.user.bot) {
+        if (
+          !member.user.bot
+        ) {
           unique.set(
             member.id,
             member
@@ -467,7 +687,9 @@ async function getTargets(guild, draft) {
         const member
         of generalRole.members.values()
       ) {
-        if (!member.user.bot) {
+        if (
+          !member.user.bot
+        ) {
           unique.set(
             member.id,
             member
@@ -485,10 +707,12 @@ async function getTargets(guild, draft) {
 }
 
 // =====================================================
-// OWNER PANEL
+// OWNER / CO-OWNER PANEL
 // =====================================================
 
-async function createOwnerPanel(guild) {
+async function createOwnerPanel(
+  guild
+) {
   const channel =
     await getChannel(
       guild,
@@ -511,12 +735,15 @@ async function createOwnerPanel(guild) {
       .fetch({
         limit: 50,
       })
-      .catch(() => null);
+      .catch(
+        () => null
+      );
 
-  const oldPanel =
+  const existing =
     messages?.find(
       message =>
-        message.author.id === client.user.id &&
+        message.author.id ===
+          client.user.id &&
         message.components.some(
           row =>
             row.components.some(
@@ -543,10 +770,14 @@ async function createOwnerPanel(guild) {
           '👥 All General Staff',
           '📣 Both Staff Groups',
           '',
-          '**Certain Selected Staff Members** only shows members who actually have the Senior Staff or General Staff role.',
+          '**Certain Selected Staff Members** only shows people with the Senior Staff or General Staff role.',
           '',
           '**Minimum deadline: 24 hours.**',
-        ].join('\n')
+          '',
+          'Deadlines automatically display in each person’s timezone.',
+        ].join(
+          '\n'
+        )
       );
 
   const row =
@@ -565,15 +796,21 @@ async function createOwnerPanel(guild) {
           )
       );
 
-  if (oldPanel) {
-    await oldPanel.edit({
-      embeds: [embed],
-      components: [row],
+  if (existing) {
+    await existing.edit({
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   } else {
     await channel.send({
-      embeds: [embed],
-      components: [row],
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   }
 }
@@ -582,7 +819,9 @@ async function createOwnerPanel(guild) {
 // GENERAL STAFF PANEL
 // =====================================================
 
-async function createGeneralStaffPanel(guild) {
+async function createGeneralStaffPanel(
+  guild
+) {
   const channel =
     await getChannel(
       guild,
@@ -593,6 +832,10 @@ async function createGeneralStaffPanel(guild) {
     !channel ||
     !channel.isTextBased()
   ) {
+    console.error(
+      '❌ General Staff reports channel not found.'
+    );
+
     return;
   }
 
@@ -601,12 +844,15 @@ async function createGeneralStaffPanel(guild) {
       .fetch({
         limit: 50,
       })
-      .catch(() => null);
+      .catch(
+        () => null
+      );
 
-  const oldPanel =
+  const existing =
     messages?.find(
       message =>
-        message.author.id === client.user.id &&
+        message.author.id ===
+          client.user.id &&
         message.components.some(
           row =>
             row.components.some(
@@ -626,8 +872,10 @@ async function createGeneralStaffPanel(guild) {
         [
           'This panel is for **General Staff**.',
           '',
-          'Reports submitted here will be sent to **Senior Staff for review**.',
-        ].join('\n')
+          'Submit reports here for **Senior Staff to review**.',
+        ].join(
+          '\n'
+        )
       );
 
   const row =
@@ -646,15 +894,21 @@ async function createGeneralStaffPanel(guild) {
           )
       );
 
-  if (oldPanel) {
-    await oldPanel.edit({
-      embeds: [embed],
-      components: [row],
+  if (existing) {
+    await existing.edit({
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   } else {
     await channel.send({
-      embeds: [embed],
-      components: [row],
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   }
 }
@@ -663,7 +917,9 @@ async function createGeneralStaffPanel(guild) {
 // SENIOR STAFF PANEL
 // =====================================================
 
-async function createSeniorStaffPanel(guild) {
+async function createSeniorStaffPanel(
+  guild
+) {
   const channel =
     await getChannel(
       guild,
@@ -674,6 +930,10 @@ async function createSeniorStaffPanel(guild) {
     !channel ||
     !channel.isTextBased()
   ) {
+    console.error(
+      '❌ Senior Staff reports channel not found.'
+    );
+
     return;
   }
 
@@ -682,12 +942,15 @@ async function createSeniorStaffPanel(guild) {
       .fetch({
         limit: 50,
       })
-      .catch(() => null);
+      .catch(
+        () => null
+      );
 
-  const oldPanel =
+  const existing =
     messages?.find(
       message =>
-        message.author.id === client.user.id &&
+        message.author.id ===
+          client.user.id &&
         message.components.some(
           row =>
             row.components.some(
@@ -707,8 +970,10 @@ async function createSeniorStaffPanel(guild) {
         [
           'This panel is for **Senior Staff**.',
           '',
-          'Reports submitted here go directly to the **Owner and Co-Owner**.',
-        ].join('\n')
+          'Reports submitted here are sent directly to the **Owner and Co-Owner**.',
+        ].join(
+          '\n'
+        )
       );
 
   const row =
@@ -727,15 +992,21 @@ async function createSeniorStaffPanel(guild) {
           )
       );
 
-  if (oldPanel) {
-    await oldPanel.edit({
-      embeds: [embed],
-      components: [row],
+  if (existing) {
+    await existing.edit({
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   } else {
     await channel.send({
-      embeds: [embed],
-      components: [row],
+      embeds:
+        [embed],
+
+      components:
+        [row],
     });
   }
 }
@@ -754,7 +1025,7 @@ function createRequestModal() {
         'Request Staff Report'
       );
 
-  const reportQuestion =
+  const report =
     new TextInputBuilder()
       .setCustomId(
         'report_question'
@@ -766,7 +1037,10 @@ function createRequestModal() {
         TextInputStyle.Paragraph
       )
       .setRequired(true)
-      .setMaxLength(1500);
+      .setMaxLength(1500)
+      .setPlaceholder(
+        'Explain what information you need.'
+      );
 
   const deadline =
     new TextInputBuilder()
@@ -788,7 +1062,7 @@ function createRequestModal() {
   modal.addComponents(
     new ActionRowBuilder()
       .addComponents(
-        reportQuestion
+        report
       ),
 
     new ActionRowBuilder()
@@ -801,7 +1075,7 @@ function createRequestModal() {
 }
 
 // =====================================================
-// CREATE PRIVATE REQUESTED REPORT
+// CREATE PRIVATE REQUEST CHANNEL
 // =====================================================
 
 async function createPrivateRequestedReport({
@@ -812,7 +1086,7 @@ async function createPrivateRequestedReport({
   hoursUntilDue,
 }) {
   const requestId =
-    makeRequestId();
+    createRequestId();
 
   const createdAt =
     Date.now();
@@ -824,11 +1098,94 @@ async function createPrivateRequestedReport({
       60 *
       1000;
 
+  const permissionOverwrites = [
+    {
+      id:
+        guild.roles.everyone.id,
+
+      deny: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+      ],
+    },
+
+    {
+      id:
+        targetMember.id,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    },
+
+    {
+      id:
+        guild.ownerId,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+
+        PermissionsBitField
+          .Flags.ManageChannels,
+      ],
+    },
+  ];
+
+  if (OWNER_ROLE_ID) {
+    permissionOverwrites.push({
+      id:
+        OWNER_ROLE_ID,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
+  if (CO_OWNER_ROLE_ID) {
+    permissionOverwrites.push({
+      id:
+        CO_OWNER_ROLE_ID,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
   const channel =
     await guild.channels.create({
       name:
         sanitizeChannelName(
-          `report-${targetMember.user.username}`
+          `report-${targetMember.user.username}-${requestId.slice(-4)}`
         ),
 
       type:
@@ -837,103 +1194,28 @@ async function createPrivateRequestedReport({
       parent:
         REQUESTED_REPORTS_CATEGORY_ID,
 
-      permissionOverwrites: [
-        {
-          id:
-            guild.roles.everyone.id,
-
-          deny: [
-            PermissionsBitField
-              .Flags.ViewChannel,
-          ],
-        },
-
-        {
-          id:
-            targetMember.id,
-
-          allow: [
-            PermissionsBitField
-              .Flags.ViewChannel,
-
-            PermissionsBitField
-              .Flags.SendMessages,
-
-            PermissionsBitField
-              .Flags.ReadMessageHistory,
-          ],
-        },
-
-        {
-          id:
-            guild.ownerId,
-
-          allow: [
-            PermissionsBitField
-              .Flags.ViewChannel,
-
-            PermissionsBitField
-              .Flags.SendMessages,
-
-            PermissionsBitField
-              .Flags.ReadMessageHistory,
-          ],
-        },
-
-        ...(OWNER_ROLE_ID
-          ? [
-              {
-                id:
-                  OWNER_ROLE_ID,
-
-                allow: [
-                  PermissionsBitField
-                    .Flags.ViewChannel,
-
-                  PermissionsBitField
-                    .Flags.SendMessages,
-
-                  PermissionsBitField
-                    .Flags.ReadMessageHistory,
-                ],
-              },
-            ]
-          : []),
-
-        ...(CO_OWNER_ROLE_ID
-          ? [
-              {
-                id:
-                  CO_OWNER_ROLE_ID,
-
-                allow: [
-                  PermissionsBitField
-                    .Flags.ViewChannel,
-
-                  PermissionsBitField
-                    .Flags.SendMessages,
-
-                  PermissionsBitField
-                    .Flags.ReadMessageHistory,
-                ],
-              },
-            ]
-          : []),
-      ],
+      permissionOverwrites,
     });
 
   data.requests[
     requestId
   ] = {
     requestId,
-    targetUserId:
-      targetMember.id,
-    requesterId,
-    reportQuestion,
-    createdAt,
-    dueAt,
+
     channelId:
       channel.id,
+
+    targetUserId:
+      targetMember.id,
+
+    requesterId,
+
+    reportQuestion,
+
+    createdAt,
+
+    dueAt,
+
     status:
       'open',
   };
@@ -957,7 +1239,11 @@ async function createPrivateRequestedReport({
           `**Deadline:** ${discordTimestamp(
             dueAt
           )}`,
-        ].join('\n')
+          '',
+          'Click **Submit Report** when finished.',
+        ].join(
+          '\n'
+        )
       );
 
   const row =
@@ -1006,11 +1292,22 @@ client.once(
       ) ||
       await client.guilds
         .fetch(GUILD_ID)
-        .catch(() => null);
+        .catch(
+          () => null
+        );
 
     if (!guild) {
+      console.error(
+        '❌ Server not found.'
+      );
+
       return;
     }
+
+    // Load members ONCE
+    await ensureMembersLoaded(
+      guild
+    );
 
     await createOwnerPanel(
       guild
@@ -1025,7 +1322,7 @@ client.once(
     );
 
     console.log(
-      '✅ Staff Reports panels ready.'
+      '✅ Staff Reports panels are ready.'
     );
   }
 );
@@ -1048,7 +1345,7 @@ client.on(
       }
 
       // =================================================
-      // REQUEST REPORT
+      // REQUEST REPORT BUTTON
       // =================================================
 
       if (
@@ -1070,7 +1367,22 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ Only Owner or Co-Owner can request reports.',
+              '❌ Only the Owner or Co-Owner can request reports.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const loaded =
+          await ensureMembersLoaded(
+            interaction.guild
+          );
+
+        if (!loaded) {
+          return interaction.reply({
+            content:
+              '❌ I could not load the staff list. Make sure Server Members Intent is enabled, then restart the bot.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1125,6 +1437,9 @@ client.on(
               {
                 label:
                   'Certain Selected Staff Members',
+
+                description:
+                  'Choose specific staff members',
 
                 value:
                   'selected_staff',
@@ -1184,7 +1499,7 @@ client.on(
       }
 
       // =================================================
-      // CHOOSE TARGET TYPE
+      // CHOOSE REPORT TARGET TYPE
       // =================================================
 
       if (
@@ -1200,7 +1515,7 @@ client.on(
         if (!draft) {
           return interaction.reply({
             content:
-              '❌ Request expired.',
+              '❌ Request expired. Start again.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1221,7 +1536,10 @@ client.on(
           draft
         );
 
-        // ONE SENIOR
+        // -----------------------------------------------
+        // ONE SENIOR STAFF
+        // -----------------------------------------------
+
         if (
           mode ===
           'one_senior'
@@ -1248,7 +1566,7 @@ client.on(
           const menu =
             new StringSelectMenuBuilder()
               .setCustomId(
-                'select_one_senior_filtered'
+                'select_one_senior'
               )
               .setPlaceholder(
                 'Select one Senior Staff member'
@@ -1272,7 +1590,10 @@ client.on(
           });
         }
 
-        // ONE GENERAL
+        // -----------------------------------------------
+        // ONE GENERAL STAFF
+        // -----------------------------------------------
+
         if (
           mode ===
           'one_general'
@@ -1299,7 +1620,7 @@ client.on(
           const menu =
             new StringSelectMenuBuilder()
               .setCustomId(
-                'select_one_general_filtered'
+                'select_one_general'
               )
               .setPlaceholder(
                 'Select one General Staff member'
@@ -1323,7 +1644,10 @@ client.on(
           });
         }
 
-        // SELECT CERTAIN STAFF
+        // -----------------------------------------------
+        // CERTAIN SELECTED STAFF
+        // -----------------------------------------------
+
         if (
           mode ===
           'selected_staff'
@@ -1349,10 +1673,10 @@ client.on(
           const menu =
             new StringSelectMenuBuilder()
               .setCustomId(
-                'select_multiple_staff_filtered'
+                'select_multiple_staff'
               )
               .setPlaceholder(
-                'Select staff members'
+                'Select the staff members'
               )
               .setMinValues(1)
               .setMaxValues(
@@ -1378,19 +1702,20 @@ client.on(
           });
         }
 
+        // All Senior / All General / Both
         return interaction.showModal(
           createRequestModal()
         );
       }
 
       // =================================================
-      // SELECT ONE SENIOR
+      // ONE SENIOR SELECTED
       // =================================================
 
       if (
         interaction.isStringSelectMenu() &&
         interaction.customId ===
-          'select_one_senior_filtered'
+          'select_one_senior'
       ) {
         const draft =
           requestDrafts.get(
@@ -1423,13 +1748,13 @@ client.on(
       }
 
       // =================================================
-      // SELECT ONE GENERAL
+      // ONE GENERAL SELECTED
       // =================================================
 
       if (
         interaction.isStringSelectMenu() &&
         interaction.customId ===
-          'select_one_general_filtered'
+          'select_one_general'
       ) {
         const draft =
           requestDrafts.get(
@@ -1462,13 +1787,13 @@ client.on(
       }
 
       // =================================================
-      // SELECT MULTIPLE STAFF
+      // MULTIPLE STAFF SELECTED
       // =================================================
 
       if (
         interaction.isStringSelectMenu() &&
         interaction.customId ===
-          'select_multiple_staff_filtered'
+          'select_multiple_staff'
       ) {
         const draft =
           requestDrafts.get(
@@ -1543,7 +1868,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ Deadline must be at least 24 hours.',
+              '❌ The deadline must be at least **24 hours**.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1573,7 +1898,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ No valid staff members found.',
+              '❌ No valid staff members were found.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1612,7 +1937,9 @@ client.on(
                 )}`,
                 '',
                 `**People Receiving Request:** ${targets.length}`,
-              ].join('\n')
+              ].join(
+                '\n'
+              )
             );
 
         const row =
@@ -1656,7 +1983,7 @@ client.on(
       }
 
       // =================================================
-      // CONFIRM REPORT REQUEST
+      // CONFIRM REQUEST
       // =================================================
 
       if (
@@ -1687,7 +2014,11 @@ client.on(
             draft
           );
 
-        let created = 0;
+        let created =
+          0;
+
+        let failed =
+          0;
 
         for (
           const target
@@ -1713,6 +2044,8 @@ client.on(
 
             created++;
           } catch (error) {
+            failed++;
+
             console.error(
               '❌ Failed to create report:',
               error
@@ -1726,7 +2059,15 @@ client.on(
 
         return interaction.editReply({
           content:
-            `✅ Created ${created} report request(s).`,
+            [
+              `✅ Created **${created}** report request(s).`,
+
+              failed > 0
+                ? `⚠️ ${failed} failed.`
+                : null,
+            ]
+              .filter(Boolean)
+              .join('\n'),
 
           embeds:
             [],
@@ -1737,7 +2078,7 @@ client.on(
       }
 
       // =================================================
-      // CANCEL
+      // CANCEL REQUEST
       // =================================================
 
       if (
@@ -1762,7 +2103,7 @@ client.on(
       }
 
       // =================================================
-      // SUBMIT REQUESTED REPORT
+      // REQUESTED REPORT SUBMIT BUTTON
       // =================================================
 
       if (
@@ -1817,7 +2158,7 @@ client.on(
               'Submit Requested Report'
             );
 
-        const reportBody =
+        const body =
           new TextInputBuilder()
             .setCustomId(
               'requested_report_body'
@@ -1831,7 +2172,7 @@ client.on(
             .setRequired(true)
             .setMaxLength(4000);
 
-        const nextReport =
+        const next =
           new TextInputBuilder()
             .setCustomId(
               'next_report_time'
@@ -1845,18 +2186,18 @@ client.on(
             .setRequired(true)
             .setMaxLength(100)
             .setPlaceholder(
-              'Example: 7 days, weekly, none'
+              'Example: weekly, 7 days, none'
             );
 
         modal.addComponents(
           new ActionRowBuilder()
             .addComponents(
-              reportBody
+              body
             ),
 
           new ActionRowBuilder()
             .addComponents(
-              nextReport
+              next
             )
         );
 
@@ -1866,7 +2207,7 @@ client.on(
       }
 
       // =================================================
-      // REQUESTED REPORT SUBMITTED
+      // REQUESTED REPORT SUBMISSION
       // =================================================
 
       if (
@@ -1892,24 +2233,39 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ Report is no longer open.',
+              '❌ This report is no longer open.',
 
             flags:
               MessageFlags.Ephemeral,
           });
         }
 
-        const reportBody =
+        if (
+          interaction.user.id !==
+          request.targetUserId
+        ) {
+          return interaction.reply({
+            content:
+              '❌ You are not assigned to this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const body =
           interaction.fields
             .getTextInputValue(
               'requested_report_body'
-            );
+            )
+            .trim();
 
-        const nextReport =
+        const next =
           interaction.fields
             .getTextInputValue(
               'next_report_time'
-            );
+            )
+            .trim();
 
         const destination =
           await getChannel(
@@ -1917,13 +2273,26 @@ client.on(
             SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID
           );
 
+        if (
+          !destination ||
+          !destination.isTextBased()
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Submitted reports channel could not be found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
         const embed =
           new EmbedBuilder()
             .setTitle(
               '📥 Submitted Requested Report'
             )
             .setDescription(
-              reportBody
+              body
             )
             .addFields(
               {
@@ -1955,7 +2324,7 @@ client.on(
                   'Next Report',
 
                 value:
-                  nextReport,
+                  next,
               }
             )
             .setTimestamp();
@@ -1971,11 +2340,17 @@ client.on(
         request.status =
           'submitted';
 
+        request.submittedAt =
+          Date.now();
+
+        request.nextReport =
+          next;
+
         saveData();
 
         await interaction.reply({
           content:
-            '✅ Report submitted.',
+            '✅ Your report was submitted.',
 
           flags:
             MessageFlags.Ephemeral,
@@ -2007,7 +2382,7 @@ client.on(
       }
 
       // =================================================
-      // GENERAL STAFF CREATE REPORT
+      // GENERAL STAFF REPORT BUTTON
       // =================================================
 
       if (
@@ -2026,7 +2401,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ General Staff only.',
+              '❌ This panel is for General Staff only.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -2088,7 +2463,7 @@ client.on(
       }
 
       // =================================================
-      // GENERAL REPORT SUBMISSION
+      // GENERAL STAFF REPORT SUBMITTED
       // =================================================
 
       if (
@@ -2118,19 +2493,34 @@ client.on(
           interaction.fields
             .getTextInputValue(
               'general_report_title'
-            );
+            )
+            .trim();
 
         const body =
           interaction.fields
             .getTextInputValue(
               'general_report_body'
-            );
+            )
+            .trim();
 
         const destination =
           await getChannel(
             interaction.guild,
             GENERAL_REPORTS_REVIEW_CHANNEL_ID
           );
+
+        if (
+          !destination ||
+          !destination.isTextBased()
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Senior Staff review channel could not be found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
 
         const embed =
           new EmbedBuilder()
@@ -2183,7 +2573,7 @@ client.on(
       }
 
       // =================================================
-      // SENIOR STAFF CREATE REPORT
+      // SENIOR STAFF REPORT BUTTON
       // =================================================
 
       if (
@@ -2202,7 +2592,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ Senior Staff only.',
+              '❌ This panel is for Senior Staff only.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -2264,7 +2654,7 @@ client.on(
       }
 
       // =================================================
-      // SENIOR REPORT SUBMISSION
+      // SENIOR STAFF REPORT SUBMITTED
       // =================================================
 
       if (
@@ -2294,19 +2684,34 @@ client.on(
           interaction.fields
             .getTextInputValue(
               'senior_report_title'
-            );
+            )
+            .trim();
 
         const body =
           interaction.fields
             .getTextInputValue(
               'senior_report_body'
-            );
+            )
+            .trim();
 
         const destination =
           await getChannel(
             interaction.guild,
             SENIOR_REPORTS_DESTINATION_CHANNEL_ID
           );
+
+        if (
+          !destination ||
+          !destination.isTextBased()
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Owner / Co-Owner report channel could not be found.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
 
         const embed =
           new EmbedBuilder()
@@ -2323,19 +2728,31 @@ client.on(
 
                 value:
                   `<@${interaction.user.id}>`,
+              },
+
+              {
+                name:
+                  'For',
+
+                value:
+                  'Owner / Co-Owner',
               }
             )
             .setTimestamp();
 
         const pings = [];
 
-        if (OWNER_ROLE_ID) {
+        if (
+          OWNER_ROLE_ID
+        ) {
           pings.push(
             `<@&${OWNER_ROLE_ID}>`
           );
         }
 
-        if (CO_OWNER_ROLE_ID) {
+        if (
+          CO_OWNER_ROLE_ID
+        ) {
           pings.push(
             `<@&${CO_OWNER_ROLE_ID}>`
           );
@@ -2343,8 +2760,9 @@ client.on(
 
         await destination.send({
           content:
-            pings.join(' ') ||
-            undefined,
+            pings.length
+              ? pings.join(' ')
+              : undefined,
 
           embeds:
             [embed],
@@ -2353,7 +2771,9 @@ client.on(
             roles: [
               OWNER_ROLE_ID,
               CO_OWNER_ROLE_ID,
-            ].filter(Boolean),
+            ].filter(
+              Boolean
+            ),
           },
         });
 
@@ -2376,21 +2796,29 @@ client.on(
         interaction.replied ||
         interaction.deferred
       ) {
-        await interaction.followUp({
-          content:
-            '❌ Something went wrong. Check the bot logs.',
+        await interaction
+          .followUp({
+            content:
+              '❌ Something went wrong. Check the bot logs.',
 
-          flags:
-            MessageFlags.Ephemeral,
-        }).catch(() => {});
+            flags:
+              MessageFlags.Ephemeral,
+          })
+          .catch(
+            () => {}
+          );
       } else {
-        await interaction.reply({
-          content:
-            '❌ Something went wrong. Check the bot logs.',
+        await interaction
+          .reply({
+            content:
+              '❌ Something went wrong. Check the bot logs.',
 
-          flags:
-            MessageFlags.Ephemeral,
-        }).catch(() => {});
+            flags:
+              MessageFlags.Ephemeral,
+          })
+          .catch(
+            () => {}
+          );
       }
     }
   }
