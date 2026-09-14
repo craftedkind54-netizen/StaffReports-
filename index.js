@@ -37,33 +37,26 @@ const GENERAL_STAFF_ROLE_ID = '1543373922668388482';
 // OWNER / CO-OWNER REQUEST SYSTEM
 // =====================================================
 
-// Owner / Co-Owner requests reports here
 const REQUEST_REPORT_CHANNEL_ID = '1549136946683576380';
 
-// Private requested-report channels are created here
 const REQUESTED_REPORTS_CATEGORY_ID = '1549140124854653038';
 
-// Finished requested reports go here
 const SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID = '1549140613788864563';
 
 // =====================================================
 // GENERAL STAFF REPORT SYSTEM
 // =====================================================
 
-// General Staff makes reports here
 const GENERAL_REPORTS_TO_MAKE_CHANNEL_ID = '1549141254653349920';
 
-// General Staff reports are reviewed by Senior Staff here
 const GENERAL_REPORTS_REVIEW_CHANNEL_ID = '1549149758202052818';
 
 // =====================================================
 // SENIOR STAFF REPORT SYSTEM
 // =====================================================
 
-// Senior Staff makes reports here
 const SENIOR_REPORTS_TO_MAKE_CHANNEL_ID = '1549148764760055838';
 
-// Senior Staff reports go here for Owner / Co-Owner
 const SENIOR_REPORTS_DESTINATION_CHANNEL_ID = '1549141094388863126';
 
 // =====================================================
@@ -71,8 +64,12 @@ const SENIOR_REPORTS_DESTINATION_CHANNEL_ID = '1549141094388863126';
 // =====================================================
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const OWNER_ROLE_ID = process.env.OWNER_ROLE_ID || null;
-const CO_OWNER_ROLE_ID = process.env.CO_OWNER_ROLE_ID || null;
+
+const OWNER_ROLE_ID =
+  process.env.OWNER_ROLE_ID || null;
+
+const CO_OWNER_ROLE_ID =
+  process.env.CO_OWNER_ROLE_ID || null;
 
 if (!DISCORD_TOKEN) {
   console.error('❌ Missing DISCORD_TOKEN.');
@@ -138,7 +135,7 @@ function saveData() {
   }
 }
 
-// Temporary Owner / Co-Owner request sessions
+// Temporary request sessions
 const requestDrafts = new Map();
 
 // =====================================================
@@ -209,6 +206,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
   ],
 });
 
@@ -383,7 +381,7 @@ function parseHours(value) {
 }
 
 // =====================================================
-// ROLE-FILTERED STAFF OPTIONS
+// ROLE OPTIONS
 // =====================================================
 
 function getRoleOptions(
@@ -444,9 +442,7 @@ function getCombinedStaffOptions(
       const member
       of seniorRole.members.values()
     ) {
-      if (
-        !member.user.bot
-      ) {
+      if (!member.user.bot) {
         unique.set(
           member.id,
           member
@@ -460,9 +456,7 @@ function getCombinedStaffOptions(
       const member
       of generalRole.members.values()
     ) {
-      if (
-        !member.user.bot
-      ) {
+      if (!member.user.bot) {
         unique.set(
           member.id,
           member
@@ -502,18 +496,12 @@ function getCombinedStaffOptions(
         return {
           label:
             member.displayName
-              .slice(
-                0,
-                100
-              ),
+              .slice(0, 100),
 
           description:
             groups
               .join(' + ')
-              .slice(
-                0,
-                100
-              ),
+              .slice(0, 100),
 
           value:
             member.id,
@@ -664,9 +652,7 @@ async function getTargets(
         const member
         of seniorRole.members.values()
       ) {
-        if (
-          !member.user.bot
-        ) {
+        if (!member.user.bot) {
           unique.set(
             member.id,
             member
@@ -680,9 +666,7 @@ async function getTargets(
         const member
         of generalRole.members.values()
       ) {
-        if (
-          !member.user.bot
-        ) {
+        if (!member.user.bot) {
           unique.set(
             member.id,
             member
@@ -700,7 +684,7 @@ async function getTargets(
 }
 
 // =====================================================
-// OWNER / CO-OWNER PANEL
+// OWNER PANEL
 // =====================================================
 
 async function createOwnerPanel(
@@ -763,14 +747,12 @@ async function createOwnerPanel(
           '👥 All General Staff',
           '📣 Both Staff Groups',
           '',
-          '**Certain Selected Staff Members** only shows people with the Senior Staff or General Staff role.',
+          '**Certain Selected Staff Members** creates one shared private report channel.',
+          '',
+          'Each selected staff member responds using the same button.',
           '',
           '**Minimum deadline: 24 hours.**',
-          '',
-          'Deadlines automatically display in each person’s timezone.',
-        ].join(
-          '\n'
-        )
+        ].join('\n')
       );
 
   const row =
@@ -791,19 +773,13 @@ async function createOwnerPanel(
 
   if (existing) {
     await existing.edit({
-      embeds:
-        [embed],
-
-      components:
-        [row],
+      embeds: [embed],
+      components: [row],
     });
   } else {
     await channel.send({
-      embeds:
-        [embed],
-
-      components:
-        [row],
+      embeds: [embed],
+      components: [row],
     });
   }
 }
@@ -825,10 +801,6 @@ async function createGeneralStaffPanel(
     !channel ||
     !channel.isTextBased()
   ) {
-    console.error(
-      '❌ General Staff reports channel not found.'
-    );
-
     return;
   }
 
@@ -866,9 +838,7 @@ async function createGeneralStaffPanel(
           'This panel is for **General Staff**.',
           '',
           'Submit reports here for **Senior Staff to review**.',
-        ].join(
-          '\n'
-        )
+        ].join('\n')
       );
 
   const row =
@@ -889,19 +859,13 @@ async function createGeneralStaffPanel(
 
   if (existing) {
     await existing.edit({
-      embeds:
-        [embed],
-
-      components:
-        [row],
+      embeds: [embed],
+      components: [row],
     });
   } else {
     await channel.send({
-      embeds:
-        [embed],
-
-      components:
-        [row],
+      embeds: [embed],
+      components: [row],
     });
   }
 }
@@ -923,10 +887,6 @@ async function createSeniorStaffPanel(
     !channel ||
     !channel.isTextBased()
   ) {
-    console.error(
-      '❌ Senior Staff reports channel not found.'
-    );
-
     return;
   }
 
@@ -964,9 +924,7 @@ async function createSeniorStaffPanel(
           'This panel is for **Senior Staff**.',
           '',
           'Reports submitted here are sent directly to the **Owner and Co-Owner**.',
-        ].join(
-          '\n'
-        )
+        ].join('\n')
       );
 
   const row =
@@ -987,19 +945,13 @@ async function createSeniorStaffPanel(
 
   if (existing) {
     await existing.edit({
-      embeds:
-        [embed],
-
-      components:
-        [row],
+      embeds: [embed],
+      components: [row],
     });
   } else {
     await channel.send({
-      embeds:
-        [embed],
-
-      components:
-        [row],
+      embeds: [embed],
+      components: [row],
     });
   }
 }
@@ -1068,7 +1020,7 @@ function createRequestModal() {
 }
 
 // =====================================================
-// CREATE PRIVATE REQUEST CHANNEL
+// STANDARD SINGLE-PERSON PRIVATE REPORT
 // =====================================================
 
 async function createPrivateRequestedReport({
@@ -1102,8 +1054,6 @@ async function createPrivateRequestedReport({
       ],
     },
 
-    // Assigned staff member can SEE the report,
-    // but cannot type normal messages.
     {
       id:
         targetMember.id,
@@ -1131,7 +1081,6 @@ async function createPrivateRequestedReport({
       ],
     },
 
-    // Server owner can view/manage the report channel.
     {
       id:
         guild.ownerId,
@@ -1209,6 +1158,9 @@ async function createPrivateRequestedReport({
   ] = {
     requestId,
 
+    type:
+      'single',
+
     channelId:
       channel.id,
 
@@ -1249,10 +1201,8 @@ async function createPrivateRequestedReport({
           '',
           'This channel is **read-only**.',
           '',
-          'Click **Submit Report** below to complete the report.',
-        ].join(
-          '\n'
-        )
+          'Click **Submit Report** below.',
+        ].join('\n')
       );
 
   const row =
@@ -1284,6 +1234,676 @@ async function createPrivateRequestedReport({
 }
 
 // =====================================================
+// SHARED SELECTED-STAFF REPORT
+// =====================================================
+
+async function createSharedSelectedReport({
+  guild,
+  targets,
+  requesterId,
+  reportQuestion,
+  hoursUntilDue,
+}) {
+  const requestId =
+    createRequestId();
+
+  const createdAt =
+    Date.now();
+
+  const dueAt =
+    createdAt +
+    hoursUntilDue *
+      60 *
+      60 *
+      1000;
+
+  const targetUserIds =
+    targets.map(
+      member =>
+        member.id
+    );
+
+  const permissionOverwrites = [
+    {
+      id:
+        guild.roles.everyone.id,
+
+      deny: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+      ],
+    },
+
+    {
+      id:
+        guild.ownerId,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+
+        PermissionsBitField
+          .Flags.ManageChannels,
+      ],
+    },
+  ];
+
+  for (
+    const member
+    of targets
+  ) {
+    permissionOverwrites.push({
+      id:
+        member.id,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+
+      deny: [
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.SendMessagesInThreads,
+
+        PermissionsBitField
+          .Flags.CreatePublicThreads,
+
+        PermissionsBitField
+          .Flags.CreatePrivateThreads,
+      ],
+    });
+  }
+
+  if (OWNER_ROLE_ID) {
+    permissionOverwrites.push({
+      id:
+        OWNER_ROLE_ID,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
+  if (CO_OWNER_ROLE_ID) {
+    permissionOverwrites.push({
+      id:
+        CO_OWNER_ROLE_ID,
+
+      allow: [
+        PermissionsBitField
+          .Flags.ViewChannel,
+
+        PermissionsBitField
+          .Flags.SendMessages,
+
+        PermissionsBitField
+          .Flags.ReadMessageHistory,
+      ],
+    });
+  }
+
+  const channel =
+    await guild.channels.create({
+      name:
+        sanitizeChannelName(
+          `report-selected-staff-${requestId.slice(-4)}`
+        ),
+
+      type:
+        ChannelType.GuildText,
+
+      parent:
+        REQUESTED_REPORTS_CATEGORY_ID,
+
+      permissionOverwrites,
+    });
+
+  const responses = {};
+
+  for (
+    const userId
+    of targetUserIds
+  ) {
+    responses[userId] = null;
+  }
+
+  data.requests[
+    requestId
+  ] = {
+    requestId,
+
+    type:
+      'shared_selected',
+
+    channelId:
+      channel.id,
+
+    targetUserIds,
+
+    requesterId,
+
+    reportQuestion,
+
+    createdAt,
+
+    dueAt,
+
+    status:
+      'open',
+
+    responses,
+
+    reminders: {
+      halfway:
+        false,
+
+      sixHours:
+        false,
+
+      oneHour:
+        false,
+    },
+  };
+
+  saveData();
+
+  const statusText =
+    targets
+      .map(
+        member =>
+          `⏳ <@${member.id}> — Waiting`
+      )
+      .join('\n');
+
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        '📋 Shared Staff Report Requested'
+      )
+      .setDescription(
+        [
+          '**Selected Staff:**',
+          targets
+            .map(
+              member =>
+                `<@${member.id}>`
+            )
+            .join(', '),
+          '',
+          `**Requested By:** <@${requesterId}>`,
+          '',
+          '**Report Needed:**',
+          reportQuestion,
+          '',
+          `**Deadline:** ${discordTimestamp(
+            dueAt
+          )}`,
+          '',
+          '**Response Status:**',
+          statusText,
+          '',
+          'This channel is **read-only**.',
+          '',
+          'Click **Respond to Report** to submit your response.',
+          '',
+          'Responses will remain visible here until the Owner or Co-Owner closes the report.',
+        ].join('\n')
+      );
+
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            `respond_shared_report:${requestId}`
+          )
+          .setLabel(
+            'Respond to Report'
+          )
+          .setEmoji('📝')
+          .setStyle(
+            ButtonStyle.Success
+          ),
+
+        new ButtonBuilder()
+          .setCustomId(
+            `close_shared_report:${requestId}`
+          )
+          .setLabel(
+            'Close Report'
+          )
+          .setEmoji('🔒')
+          .setStyle(
+            ButtonStyle.Danger
+          )
+      );
+
+  const controlMessage =
+    await channel.send({
+      content:
+        targetUserIds
+          .map(
+            id =>
+              `<@${id}>`
+          )
+          .join(' '),
+
+      embeds:
+        [embed],
+
+      components:
+        [row],
+
+      allowedMentions: {
+        users:
+          targetUserIds,
+      },
+    });
+
+  data.requests[
+    requestId
+  ].controlMessageId =
+    controlMessage.id;
+
+  saveData();
+}
+
+// =====================================================
+// UPDATE SHARED STATUS
+// =====================================================
+
+async function updateSharedStatus(
+  guild,
+  request
+) {
+  if (
+    request.type !==
+    'shared_selected'
+  ) {
+    return;
+  }
+
+  const channel =
+    await getChannel(
+      guild,
+      request.channelId
+    );
+
+  if (
+    !channel ||
+    !channel.isTextBased()
+  ) {
+    return;
+  }
+
+  if (
+    !request.controlMessageId
+  ) {
+    return;
+  }
+
+  const message =
+    await channel.messages
+      .fetch(
+        request.controlMessageId
+      )
+      .catch(
+        () => null
+      );
+
+  if (!message) {
+    return;
+  }
+
+  const statusText =
+    request.targetUserIds
+      .map(
+        userId => {
+          const responded =
+            Boolean(
+              request.responses?.[
+                userId
+              ]
+            );
+
+          return responded
+            ? `✅ <@${userId}> — Responded`
+            : `⏳ <@${userId}> — Waiting`;
+        }
+      )
+      .join('\n');
+
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        '📋 Shared Staff Report Requested'
+      )
+      .setDescription(
+        [
+          '**Selected Staff:**',
+          request.targetUserIds
+            .map(
+              id =>
+                `<@${id}>`
+            )
+            .join(', '),
+          '',
+          `**Requested By:** <@${request.requesterId}>`,
+          '',
+          '**Report Needed:**',
+          request.reportQuestion,
+          '',
+          `**Deadline:** ${discordTimestamp(
+            request.dueAt
+          )}`,
+          '',
+          '**Response Status:**',
+          statusText,
+          '',
+          'This channel is **read-only**.',
+          '',
+          'Click **Respond to Report** to submit your response.',
+          '',
+          'Responses stay here until the report is closed.',
+        ].join('\n')
+      );
+
+  const allResponded =
+    request.targetUserIds
+      .every(
+        userId =>
+          Boolean(
+            request.responses?.[
+              userId
+            ]
+          )
+      );
+
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            `respond_shared_report:${request.requestId}`
+          )
+          .setLabel(
+            allResponded
+              ? 'All Responses Submitted'
+              : 'Respond to Report'
+          )
+          .setEmoji(
+            allResponded
+              ? '✅'
+              : '📝'
+          )
+          .setStyle(
+            ButtonStyle.Success
+          )
+          .setDisabled(
+            allResponded
+          ),
+
+        new ButtonBuilder()
+          .setCustomId(
+            `close_shared_report:${request.requestId}`
+          )
+          .setLabel(
+            'Close Report'
+          )
+          .setEmoji('🔒')
+          .setStyle(
+            ButtonStyle.Danger
+          )
+      );
+
+  await message
+    .edit({
+      embeds:
+        [embed],
+
+      components:
+        [row],
+    })
+    .catch(
+      console.error
+    );
+}
+
+// =====================================================
+// REMINDER SYSTEM
+// =====================================================
+
+async function checkReportReminders() {
+  const guild =
+    client.guilds.cache.get(
+      GUILD_ID
+    );
+
+  if (!guild) {
+    return;
+  }
+
+  const now =
+    Date.now();
+
+  for (
+    const request
+    of Object.values(
+      data.requests
+    )
+  ) {
+    if (
+      request.type !==
+        'shared_selected' ||
+      request.status !==
+        'open'
+    ) {
+      continue;
+    }
+
+    const pendingUsers =
+      request.targetUserIds
+        .filter(
+          userId =>
+            !request.responses?.[
+              userId
+            ]
+        );
+
+    // Nobody left to remind
+    if (
+      pendingUsers.length ===
+      0
+    ) {
+      continue;
+    }
+
+    const channel =
+      await getChannel(
+        guild,
+        request.channelId
+      );
+
+    if (
+      !channel ||
+      !channel.isTextBased()
+    ) {
+      continue;
+    }
+
+    const totalDuration =
+      request.dueAt -
+      request.createdAt;
+
+    const remaining =
+      request.dueAt -
+      now;
+
+    const halfwayPoint =
+      request.createdAt +
+      totalDuration / 2;
+
+    const sixHoursMs =
+      6 *
+      60 *
+      60 *
+      1000;
+
+    const oneHourMs =
+      60 *
+      60 *
+      1000;
+
+    if (
+      now >=
+        halfwayPoint &&
+      !request.reminders
+        ?.halfway &&
+      remaining >
+        sixHoursMs
+    ) {
+      await sendReminder(
+        channel,
+        request,
+        pendingUsers,
+        '⏰ **Report Reminder**',
+        'The report is now halfway to its deadline.'
+      );
+
+      request.reminders.halfway =
+        true;
+
+      saveData();
+    }
+
+    if (
+      remaining <=
+        sixHoursMs &&
+      remaining >
+        oneHourMs &&
+      !request.reminders
+        ?.sixHours
+    ) {
+      await sendReminder(
+        channel,
+        request,
+        pendingUsers,
+        '⚠️ **6 Hour Report Reminder**',
+        'This report is due in approximately **6 hours**.'
+      );
+
+      request.reminders.sixHours =
+        true;
+
+      saveData();
+    }
+
+    if (
+      remaining <=
+        oneHourMs &&
+      remaining >
+        0 &&
+      !request.reminders
+        ?.oneHour
+    ) {
+      await sendReminder(
+        channel,
+        request,
+        pendingUsers,
+        '🚨 **Final Report Reminder**',
+        'This report is due in approximately **1 hour**.'
+      );
+
+      request.reminders.oneHour =
+        true;
+
+      saveData();
+    }
+  }
+}
+
+async function sendReminder(
+  channel,
+  request,
+  pendingUsers,
+  title,
+  message
+) {
+  if (
+    pendingUsers.length ===
+    0
+  ) {
+    return;
+  }
+
+  const mentions =
+    pendingUsers
+      .map(
+        id =>
+          `<@${id}>`
+      )
+      .join(' ');
+
+  const embed =
+    new EmbedBuilder()
+      .setTitle(
+        title
+      )
+      .setDescription(
+        [
+          message,
+          '',
+          '**Still waiting for:**',
+          pendingUsers
+            .map(
+              id =>
+                `<@${id}>`
+            )
+            .join('\n'),
+          '',
+          `**Deadline:** ${discordTimestamp(
+            request.dueAt
+          )}`,
+          '',
+          'Click **Respond to Report** above to complete your response.',
+        ].join('\n')
+      );
+
+  await channel.send({
+    content:
+      mentions,
+
+    embeds:
+      [embed],
+
+    allowedMentions: {
+      users:
+        pendingUsers,
+    },
+  });
+}
+
+// =====================================================
 // READY
 // =====================================================
 
@@ -1300,7 +1920,9 @@ client.once(
         GUILD_ID
       ) ||
       await client.guilds
-        .fetch(GUILD_ID)
+        .fetch(
+          GUILD_ID
+        )
         .catch(
           () => null
         );
@@ -1329,9 +1951,88 @@ client.once(
       guild
     );
 
-    console.log(
-      '✅ Staff Reports panels are ready.'
+    // Check reminders every minute.
+    setInterval(
+      checkReportReminders,
+      60 * 1000
     );
+
+    // Check immediately after restart.
+    await checkReportReminders();
+
+    console.log(
+      '✅ Staff Reports system ready.'
+    );
+  }
+);
+
+// =====================================================
+// DELETE STAFF CHAT MESSAGES FROM REPORT CHANNELS
+// =====================================================
+
+client.on(
+  Events.MessageCreate,
+
+  async message => {
+    try {
+      if (
+        !message.guild ||
+        message.guild.id !==
+          GUILD_ID ||
+        message.author.bot
+      ) {
+        return;
+      }
+
+      const request =
+        Object.values(
+          data.requests
+        )
+          .find(
+            item =>
+              item.channelId ===
+                message.channel.id &&
+              item.status ===
+                'open'
+          );
+
+      if (!request) {
+        return;
+      }
+
+      let assigned =
+        false;
+
+      if (
+        request.type ===
+        'shared_selected'
+      ) {
+        assigned =
+          request.targetUserIds
+            ?.includes(
+              message.author.id
+            );
+      } else {
+        assigned =
+          request.targetUserId ===
+          message.author.id;
+      }
+
+      if (!assigned) {
+        return;
+      }
+
+      await message
+        .delete()
+        .catch(
+          () => {}
+        );
+    } catch (error) {
+      console.error(
+        '❌ Report message cleanup error:',
+        error
+      );
+    }
   }
 );
 
@@ -1353,7 +2054,7 @@ client.on(
       }
 
       // =================================================
-      // REQUEST REPORT BUTTON
+      // REQUEST REPORT
       // =================================================
 
       if (
@@ -1390,7 +2091,7 @@ client.on(
         if (!loaded) {
           return interaction.reply({
             content:
-              '❌ I could not load the staff list. Make sure Server Members Intent is enabled, then restart the bot.',
+              '❌ I could not load the staff list.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1447,7 +2148,7 @@ client.on(
                   'Certain Selected Staff Members',
 
                 description:
-                  'Choose specific staff members',
+                  'One shared report channel',
 
                 value:
                   'selected_staff',
@@ -1507,7 +2208,7 @@ client.on(
       }
 
       // =================================================
-      // CHOOSE REPORT TARGET TYPE
+      // CHOOSE TARGET TYPE
       // =================================================
 
       if (
@@ -1554,13 +2255,10 @@ client.on(
               SENIOR_STAFF_ROLE_ID
             );
 
-          if (
-            options.length ===
-            0
-          ) {
+          if (!options.length) {
             return interaction.update({
               content:
-                '❌ No Senior Staff members were found.',
+                '❌ No Senior Staff found.',
 
               components:
                 [],
@@ -1573,7 +2271,7 @@ client.on(
                 'select_one_senior'
               )
               .setPlaceholder(
-                'Select one Senior Staff member'
+                'Select Senior Staff member'
               )
               .setMinValues(1)
               .setMaxValues(1)
@@ -1604,13 +2302,10 @@ client.on(
               GENERAL_STAFF_ROLE_ID
             );
 
-          if (
-            options.length ===
-            0
-          ) {
+          if (!options.length) {
             return interaction.update({
               content:
-                '❌ No General Staff members were found.',
+                '❌ No General Staff found.',
 
               components:
                 [],
@@ -1623,7 +2318,7 @@ client.on(
                 'select_one_general'
               )
               .setPlaceholder(
-                'Select one General Staff member'
+                'Select General Staff member'
               )
               .setMinValues(1)
               .setMaxValues(1)
@@ -1653,13 +2348,10 @@ client.on(
               interaction.guild
             );
 
-          if (
-            options.length ===
-            0
-          ) {
+          if (!options.length) {
             return interaction.update({
               content:
-                '❌ No Senior Staff or General Staff members were found.',
+                '❌ No staff members were found.',
 
               components:
                 [],
@@ -1672,7 +2364,7 @@ client.on(
                 'select_multiple_staff'
               )
               .setPlaceholder(
-                'Select the staff members'
+                'Select staff members'
               )
               .setMinValues(1)
               .setMaxValues(
@@ -1687,7 +2379,7 @@ client.on(
 
           return interaction.update({
             content:
-              '**Step 2:** Select the specific Senior Staff and/or General Staff members.',
+              '**Step 2:** Select everyone who should respond.',
 
             components: [
               new ActionRowBuilder()
@@ -1782,7 +2474,7 @@ client.on(
       }
 
       // =================================================
-      // MULTIPLE STAFF SELECTED
+      // MULTIPLE SELECTED
       // =================================================
 
       if (
@@ -1863,7 +2555,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ The deadline must be at least **24 hours**.',
+              '❌ Deadline must be at least **24 hours**.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1887,13 +2579,10 @@ client.on(
             draft
           );
 
-        if (
-          targets.length ===
-          0
-        ) {
+        if (!targets.length) {
           return interaction.reply({
             content:
-              '❌ No valid staff members were found.',
+              '❌ No valid staff members found.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -1932,9 +2621,7 @@ client.on(
                 )}`,
                 '',
                 `**People Receiving Request:** ${targets.length}`,
-              ].join(
-                '\n'
-              )
+              ].join('\n')
             );
 
         const row =
@@ -2015,17 +2702,20 @@ client.on(
         let failed =
           0;
 
-        for (
-          const target
-          of targets
+        // ===============================================
+        // SELECTED STAFF = ONE SHARED CHANNEL
+        // ===============================================
+
+        if (
+          draft.targetMode ===
+          'selected_staff'
         ) {
           try {
-            await createPrivateRequestedReport({
+            await createSharedSelectedReport({
               guild:
                 interaction.guild,
 
-              targetMember:
-                target,
+              targets,
 
               requesterId:
                 interaction.user.id,
@@ -2037,14 +2727,50 @@ client.on(
                 draft.hoursUntilDue,
             });
 
-            created++;
+            created =
+              1;
           } catch (error) {
-            failed++;
+            failed =
+              1;
 
             console.error(
-              '❌ Failed to create report:',
+              '❌ Failed to create shared report:',
               error
             );
+          }
+        } else {
+          // Other modes still create individual channels
+          for (
+            const target
+            of targets
+          ) {
+            try {
+              await createPrivateRequestedReport({
+                guild:
+                  interaction.guild,
+
+                targetMember:
+                  target,
+
+                requesterId:
+                  interaction.user.id,
+
+                reportQuestion:
+                  draft.reportQuestion,
+
+                hoursUntilDue:
+                  draft.hoursUntilDue,
+              });
+
+              created++;
+            } catch (error) {
+              failed++;
+
+              console.error(
+                '❌ Failed to create report:',
+                error
+              );
+            }
           }
         }
 
@@ -2054,15 +2780,22 @@ client.on(
 
         return interaction.editReply({
           content:
-            [
-              `✅ Created **${created}** report request(s).`,
+            draft.targetMode ===
+              'selected_staff'
+              ? (
+                created
+                  ? '✅ Shared staff report created.'
+                  : '❌ Shared report could not be created.'
+              )
+              : [
+                  `✅ Created **${created}** report request(s).`,
 
-              failed > 0
-                ? `⚠️ ${failed} failed.`
-                : null,
-            ]
-              .filter(Boolean)
-              .join('\n'),
+                  failed > 0
+                    ? `⚠️ ${failed} failed.`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
 
           embeds:
             [],
@@ -2098,7 +2831,377 @@ client.on(
       }
 
       // =================================================
-      // REQUESTED REPORT SUBMIT BUTTON
+      // SHARED REPORT RESPOND BUTTON
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId.startsWith(
+          'respond_shared_report:'
+        )
+      ) {
+        const requestId =
+          interaction.customId
+            .split(':')[1];
+
+        const request =
+          data.requests[
+            requestId
+          ];
+
+        if (
+          !request ||
+          request.status !==
+            'open' ||
+          request.type !==
+            'shared_selected'
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This report is no longer open.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        if (
+          !request.targetUserIds
+            .includes(
+              interaction.user.id
+            )
+        ) {
+          return interaction.reply({
+            content:
+              '❌ You were not selected to respond to this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        if (
+          request.responses?.[
+            interaction.user.id
+          ]
+        ) {
+          return interaction.reply({
+            content:
+              '✅ You already submitted your response. You can review it in this channel.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const modal =
+          new ModalBuilder()
+            .setCustomId(
+              `shared_report_submission:${requestId}`
+            )
+            .setTitle(
+              'Respond to Report'
+            );
+
+        const body =
+          new TextInputBuilder()
+            .setCustomId(
+              'shared_report_body'
+            )
+            .setLabel(
+              'Your Response'
+            )
+            .setStyle(
+              TextInputStyle.Paragraph
+            )
+            .setRequired(true)
+            .setMaxLength(4000)
+            .setPlaceholder(
+              'Type your response here.'
+            );
+
+        modal.addComponents(
+          new ActionRowBuilder()
+            .addComponents(
+              body
+            )
+        );
+
+        return interaction.showModal(
+          modal
+        );
+      }
+
+      // =================================================
+      // SHARED RESPONSE SUBMITTED
+      // =================================================
+
+      if (
+        interaction.isModalSubmit() &&
+        interaction.customId.startsWith(
+          'shared_report_submission:'
+        )
+      ) {
+        const requestId =
+          interaction.customId
+            .split(':')[1];
+
+        const request =
+          data.requests[
+            requestId
+          ];
+
+        if (
+          !request ||
+          request.status !==
+            'open' ||
+          request.type !==
+            'shared_selected'
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This report is no longer open.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        if (
+          !request.targetUserIds
+            .includes(
+              interaction.user.id
+            )
+        ) {
+          return interaction.reply({
+            content:
+              '❌ You are not part of this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        if (
+          request.responses?.[
+            interaction.user.id
+          ]
+        ) {
+          return interaction.reply({
+            content:
+              '❌ You already responded.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const body =
+          interaction.fields
+            .getTextInputValue(
+              'shared_report_body'
+            )
+            .trim();
+
+        const submittedAt =
+          Date.now();
+
+        request.responses[
+          interaction.user.id
+        ] = {
+          body,
+          submittedAt,
+        };
+
+        saveData();
+
+        const responseEmbed =
+          new EmbedBuilder()
+            .setTitle(
+              '📝 Staff Response'
+            )
+            .setDescription(
+              body
+            )
+            .addFields(
+              {
+                name:
+                  'Responded By',
+
+                value:
+                  `<@${interaction.user.id}>`,
+              },
+
+              {
+                name:
+                  'Original Report Request',
+
+                value:
+                  request.reportQuestion,
+              }
+            )
+            .setTimestamp();
+
+        // ===============================================
+        // PLACE #1: SHARED REPORT CHANNEL
+        // ===============================================
+
+        await interaction.channel
+          .send({
+            embeds:
+              [responseEmbed],
+          });
+
+        // ===============================================
+        // PLACE #2: SUBMITTED REPORTS CHANNEL
+        // ===============================================
+
+        const destination =
+          await getChannel(
+            interaction.guild,
+            SUBMITTED_REQUESTED_REPORTS_CHANNEL_ID
+          );
+
+        if (
+          destination &&
+          destination.isTextBased()
+        ) {
+          await destination.send({
+            content:
+              `<@${request.requesterId}>`,
+
+            embeds:
+              [responseEmbed],
+          });
+        }
+
+        await updateSharedStatus(
+          interaction.guild,
+          request
+        );
+
+        const pendingCount =
+          request.targetUserIds
+            .filter(
+              userId =>
+                !request.responses?.[
+                  userId
+                ]
+            )
+            .length;
+
+        return interaction.reply({
+          content:
+            pendingCount ===
+              0
+              ? '✅ Your response was submitted. Everyone has now responded. The report will stay open until Owner/Co-Owner closes it.'
+              : `✅ Your response was submitted. **${pendingCount}** staff member(s) still need to respond.`,
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+      }
+
+      // =================================================
+      // CLOSE SHARED REPORT
+      // =================================================
+
+      if (
+        interaction.isButton() &&
+        interaction.customId.startsWith(
+          'close_shared_report:'
+        )
+      ) {
+        const requestId =
+          interaction.customId
+            .split(':')[1];
+
+        const request =
+          data.requests[
+            requestId
+          ];
+
+        if (
+          !request ||
+          request.status !==
+            'open'
+        ) {
+          return interaction.reply({
+            content:
+              '❌ This report is already closed.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        const member =
+          await getMember(
+            interaction.guild,
+            interaction.user.id
+          );
+
+        if (
+          !canRequestReports(
+            member,
+            interaction.guild
+          )
+        ) {
+          return interaction.reply({
+            content:
+              '❌ Only Owner or Co-Owner can close this report.',
+
+            flags:
+              MessageFlags.Ephemeral,
+          });
+        }
+
+        request.status =
+          'closed';
+
+        request.closedAt =
+          Date.now();
+
+        request.closedBy =
+          interaction.user.id;
+
+        saveData();
+
+        await interaction.reply({
+          content:
+            '🔒 Report closed. This channel will be deleted in 5 seconds.',
+
+          flags:
+            MessageFlags.Ephemeral,
+        });
+
+        const channel =
+          interaction.channel;
+
+        setTimeout(
+          async () => {
+            if (
+              channel &&
+              channel.deletable
+            ) {
+              await channel
+                .delete(
+                  'Shared staff report closed'
+                )
+                .catch(
+                  console.error
+                );
+            }
+          },
+
+          5000
+        );
+
+        return;
+      }
+
+      // =================================================
+      // NORMAL SINGLE REPORT SUBMIT BUTTON
       // =================================================
 
       if (
@@ -2108,9 +3211,8 @@ client.on(
         )
       ) {
         const requestId =
-          interaction.customId.split(
-            ':'
-          )[1];
+          interaction.customId
+            .split(':')[1];
 
         const request =
           data.requests[
@@ -2137,7 +3239,7 @@ client.on(
         ) {
           return interaction.reply({
             content:
-              '❌ This report is assigned to someone else. Only the assigned staff member can submit it.',
+              '❌ Only the assigned staff member can submit this report.',
 
             flags:
               MessageFlags.Ephemeral,
@@ -2165,10 +3267,7 @@ client.on(
               TextInputStyle.Paragraph
             )
             .setRequired(true)
-            .setMaxLength(4000)
-            .setPlaceholder(
-              'Type your full report here.'
-            );
+            .setMaxLength(4000);
 
         const next =
           new TextInputBuilder()
@@ -2205,7 +3304,7 @@ client.on(
       }
 
       // =================================================
-      // REQUESTED REPORT SUBMISSION
+      // NORMAL SINGLE REPORT SUBMISSION
       // =================================================
 
       if (
@@ -2215,9 +3314,8 @@ client.on(
         )
       ) {
         const requestId =
-          interaction.customId.split(
-            ':'
-          )[1];
+          interaction.customId
+            .split(':')[1];
 
         const request =
           data.requests[
@@ -2348,7 +3446,7 @@ client.on(
 
         await interaction.reply({
           content:
-            '✅ Your report was submitted successfully.',
+            '✅ Your report was submitted.',
 
           flags:
             MessageFlags.Ephemeral,
@@ -2461,7 +3559,7 @@ client.on(
       }
 
       // =================================================
-      // GENERAL STAFF REPORT SUBMITTED
+      // GENERAL REPORT SUBMISSION
       // =================================================
 
       if (
@@ -2652,7 +3750,7 @@ client.on(
       }
 
       // =================================================
-      // SENIOR STAFF REPORT SUBMITTED
+      // SENIOR STAFF SUBMISSION
       // =================================================
 
       if (
